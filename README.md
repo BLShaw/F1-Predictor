@@ -43,11 +43,24 @@ graph TD
     J --> C
     K --> B
     
-    style A fill:#e1f5fe
-    style E fill:#e8f5e8
-    style F fill:#fff3e0
-    style G fill:#f3e5f5
-    style O fill:#e3f2fd
+    %% High contrast theme-aware colors with visible arrows
+    classDef uiNode fill:#4fc3f7,stroke:#01579b,stroke-width:2px,color:#000
+    classDef apiNode fill:#81c784,stroke:#1b5e20,stroke-width:2px,color:#000
+    classDef weatherNode fill:#ffb74d,stroke:#e65100,stroke-width:2px,color:#000
+    classDef modelNode fill:#ba68c8,stroke:#4a148c,stroke-width:2px,color:#000
+    classDef resultNode fill:#64b5f6,stroke:#0d47a1,stroke-width:2px,color:#000
+    classDef defaultNode fill:#e0e0e0,stroke:#424242,stroke-width:2px,color:#000
+    
+    %% Apply classes
+    class A uiNode
+    class E apiNode
+    class F weatherNode
+    class G modelNode
+    class O resultNode
+    class B,C,D,H,I,J,K,M,N defaultNode
+
+    %% Style for arrows to be visible in both themes
+    linkStyle default stroke:#888,stroke-width:2px
 ```
 
 ## Installation
