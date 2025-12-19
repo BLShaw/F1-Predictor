@@ -1,0 +1,46 @@
+# Dependencies
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+.venv/
+env.bak/
+venv.bak/
+.pytest_cache/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.egg-info/
+.sdist/
+.wheel/
+.lck
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+.Origin/
+
+# Cache directory - include directory but not contents
+f1_cache/*
+!f1_cache/.gitkeep
+
+# Tests
+tests/

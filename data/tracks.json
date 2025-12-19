@@ -1,0 +1,51 @@
+{
+    "TRACK_COORDINATES": {
+        "Monaco": {"lat": 43.7384, "lon": 7.4246},
+        "Silverstone": {"lat": 52.0786, "lon": -1.0167},
+        "Spa-Francorchamps": {"lat": 50.4372, "lon": 5.9713},
+        "Hungaroring": {"lat": 47.5789, "lon": 19.2485},
+        "Zandvoort": {"lat": 52.3888, "lon": 4.5407},
+        "Monza": {"lat": 45.6234, "lon": 9.2976},
+        "Suzuka": {"lat": 34.8431, "lon": 136.5387},
+        "Austin": {"lat": 30.1328, "lon": -97.6411},
+        "Mexico City": {"lat": 19.4042, "lon": -99.0907},
+        "São Paulo": {"lat": -23.7037, "lon": -46.6995},
+        "Las Vegas": {"lat": 36.1581, "lon": -115.1678},
+        "Yas Marina": {"lat": 24.4749, "lon": 54.6038},
+        "Bahrain": {"lat": 26.0420, "lon": 50.5042},
+        "Qatar Grand Prix": {"lat": 25.4888, "lon": 51.4542}
+    },
+    "TRACK_SPECIFIC_POSITION_CHANGE": {
+        "Monaco": {
+            "VER": -1.0, "NOR": 1.0, "PIA": 0.2, "RUS": 0.5, "SAI": -0.3,
+            "ALB": 0.8, "LEC": -1.5, "OCO": -0.2, "HAM": 0.3, "STR": 1.1,
+            "GAS": -0.4, "ALO": -0.6, "HUL": 0.0
+        }
+    },
+    "TRACK_CHARACTERISTICS": {
+        "Bahrain": {"Downforce": 3, "PitLoss": 23.0},
+        "Saudi Arabia": {"Downforce": 2, "PitLoss": 20.0},
+        "Australia": {"Downforce": 3, "PitLoss": 21.0},
+        "Japan": {"Downforce": 4, "PitLoss": 22.5},
+        "China": {"Downforce": 3, "PitLoss": 24.0},
+        "Miami": {"Downforce": 3, "PitLoss": 21.0},
+        "Emilia Romagna": {"Downforce": 4, "PitLoss": 25.0},
+        "Monaco": {"Downforce": 5, "PitLoss": 19.0},
+        "Canada": {"Downforce": 2, "PitLoss": 20.0},
+        "Spain": {"Downforce": 5, "PitLoss": 22.0},
+        "Austria": {"Downforce": 3, "PitLoss": 21.0},
+        "Great Britain": {"Downforce": 4, "PitLoss": 24.0},
+        "Hungary": {"Downforce": 5, "PitLoss": 20.5},
+        "Belgium": {"Downforce": 2, "PitLoss": 21.5},
+        "Netherlands": {"Downforce": 5, "PitLoss": 21.0},
+        "Italy": {"Downforce": 1, "PitLoss": 24.0},
+        "Azerbaijan": {"Downforce": 2, "PitLoss": 21.0},
+        "Singapore": {"Downforce": 5, "PitLoss": 28.0},
+        "United States": {"Downforce": 4, "PitLoss": 22.0},
+        "Mexico": {"Downforce": 5, "PitLoss": 22.0},
+        "Brazil": {"Downforce": 3, "PitLoss": 21.0},
+        "Las Vegas": {"Downforce": 1, "PitLoss": 20.0},
+        "Qatar Grand Prix": {"Downforce": 4, "PitLoss": 23.0},
+        "Abu Dhabi": {"Downforce": 3, "PitLoss": 22.0}
+    }
+}

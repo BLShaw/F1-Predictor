@@ -1,0 +1,36 @@
+{
+    "QUALIFYING_2025_DATA": {
+        "Driver": ["VER", "NOR", "PIA", "RUS", "SAI", "ALB", "LEC", "OCO",
+                   "HAM", "STR", "GAS", "ALO", "HUL"],
+        "QualifyingTime (s)": [
+            70.669, 69.954, 70.129, null, 71.362, 71.213, 70.063, 70.942,
+            70.382, 72.563, 71.994, 70.924, 71.596
+        ]
+    },
+    "RACE_SCHEDULE": [
+        {"name": "Bahrain", "location": "Bahrain International Circuit", "round": 1, "date": "2025-03-09"},
+        {"name": "Saudi Arabia", "location": "Jeddah Corniche Circuit", "round": 2, "date": "2025-03-23"},
+        {"name": "Australia", "location": "Albert Park Circuit", "round": 3, "date": "2025-04-06"},
+        {"name": "Japan", "location": "Suzuka Circuit", "round": 4, "date": "2025-04-13"},
+        {"name": "China", "location": "Shanghai International Circuit", "round": 5, "date": "2025-04-20"},
+        {"name": "Miami", "location": "Miami International Autodrome", "round": 6, "date": "2025-05-04"},
+        {"name": "Emilia Romagna", "location": "Imola Circuit", "round": 7, "date": "2025-05-18"},
+        {"name": "Monaco", "location": "Circuit de Monaco", "round": 8, "date": "2025-05-25"},
+        {"name": "Canada", "location": "Circuit Gilles Villeneuve", "round": 9, "date": "2025-06-08"},
+        {"name": "Spain", "location": "Circuit de Barcelona-Catalunya", "round": 10, "date": "2025-06-22"},
+        {"name": "Austria", "location": "Red Bull Ring", "round": 11, "date": "2025-06-29"},
+        {"name": "Great Britain", "location": "Silverstone Circuit", "round": 12, "date": "2025-07-06"},
+        {"name": "Hungary", "location": "Hungaroring", "round": 13, "date": "2025-07-20"},
+        {"name": "Belgium", "location": "Circuit de Spa-Francorchamps", "round": 14, "date": "2025-07-27"},
+        {"name": "Netherlands", "location": "Circuit Zandvoort", "round": 15, "date": "2025-08-24"},
+        {"name": "Italy", "location": "Monza Circuit", "round": 16, "date": "2025-09-07"},
+        {"name": "Azerbaijan", "location": "Baku City Circuit", "round": 17, "date": "2025-09-14"},
+        {"name": "Singapore", "location": "Marina Bay Street Circuit", "round": 18, "date": "2025-09-21"},
+        {"name": "United States", "location": "Circuit of the Americas", "round": 19, "date": "2025-10-05"},
+        {"name": "Mexico", "location": "Autódromo Hermanos Rodríguez", "round": 20, "date": "2025-10-26"},
+        {"name": "Brazil", "location": "Interlagos Circuit", "round": 21, "date": "2025-11-02"},
+        {"name": "Las Vegas", "location": "Las Vegas Strip Circuit", "round": 22, "date": "2025-11-16"},
+        {"name": "Qatar Grand Prix", "location": "Losail International Circuit", "round": 23, "date": "2025-11-23"},
+        {"name": "Abu Dhabi", "location": "Yas Marina Circuit", "round": 24, "date": "2025-11-30"}
+    ]
+}

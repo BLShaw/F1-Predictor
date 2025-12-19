@@ -1,0 +1,18 @@
+{
+    "CLEAN_AIR_RACE_PACE": {
+        "VER": 93.191067, "HAM": 94.020622, "LEC": 93.418667, "NOR": 93.428600, 
+        "ALO": 94.784333, "PIA": 93.232111, "RUS": 93.833378, "SAI": 94.497444, 
+        "STR": 95.318250, "HUL": 95.345455, "OCO": 95.682128
+    },
+    "DRIVER_TO_TEAM": {
+        "VER": "Red Bull", "NOR": "McLaren", "PIA": "McLaren", "LEC": "Ferrari", 
+        "RUS": "Mercedes", "HAM": "Mercedes", "GAS": "Alpine", "ALO": "Aston Martin", 
+        "TSU": "Racing Bulls", "SAI": "Ferrari", "HUL": "Kick Sauber", 
+        "OCO": "Alpine", "STR": "Aston Martin", "ALB": "Williams"
+    },
+    "AVERAGE_POSITION_CHANGE": {
+        "VER": -1.0, "NOR": 1.0, "PIA": 0.2, "RUS": 0.5, "SAI": -0.3,
+        "ALB": 0.8, "LEC": -1.5, "OCO": -0.2, "HAM": 0.3, "STR": 1.1,
+        "GAS": -0.4, "ALO": -0.6, "HUL": 0.0
+    }
+}

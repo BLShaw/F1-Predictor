@@ -3,5 +3,7 @@ fastf1
 pandas
 numpy
 scikit-learn
-matplotlib
+plotly
 requests
+pytest
+bandit

@@ -1,226 +1,301 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
 from src.data_loader import load_session_data, aggregate_sector_times, prepare_qualifying_data
 from src.model import F1RacePredictor
-from src.config import WEATHER_API_KEY, RACE_SCHEDULE
+from src.config import WEATHER_API_KEY, RACE_SCHEDULE, CLEAN_AIR_RACE_PACE, QUALIFYING_2025_DATA
 
+# --- Page Configuration ---
 st.set_page_config(
-    page_title="F1 Race Predictor",
+    page_title="F1 Strategy AI",
     page_icon="🏎️",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-st.title("🏎️ F1 Race Predictor")
-st.markdown("Predict F1 race results using machine learning")
+# --- Custom CSS ---
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #0e1117;
+        color: #fafafa;
+    }
+    .f1-header {
+        color: #FF1801;
+        font-weight: 800;
+        font-family: 'Segoe UI', sans-serif;
+    }
+    .stat-box {
+        background-color: #262730;
+        padding: 15px;
+        border-radius: 5px;
+        border-left: 5px solid #FF1801;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Sidebar for configuration
-with st.sidebar:
-    st.header("Race Selection")
-    
-    # Race selection
-    race_options = [race["name"] for race in RACE_SCHEDULE]
-    selected_race_name = st.selectbox("Select Race", options=race_options, index=7)  # Default to Monaco
-    selected_race = next((race for race in RACE_SCHEDULE if race["name"] == selected_race_name), RACE_SCHEDULE[7])  # Default to Monaco
-    
-    st.subheader(f"Selected: {selected_race['name']} Grand Prix")
-    st.markdown(f"**Location:** {selected_race['location']}")
-    st.markdown(f"**Date:** {selected_race['date']}")
-    st.markdown(f"**Round:** {selected_race['round']}")
-
-# Sidebar for configuration
-with st.sidebar:
-    st.header("Configuration")
-    
-    # Weather API key input
-    api_key = st.text_input(
-        "OpenWeather API Key", 
-        value=WEATHER_API_KEY if WEATHER_API_KEY != "YOURAPIKEY" else "",
-        type="password",
-        help="Enter your OpenWeatherMap API key for weather data"
-    )
-    
-    # Model parameters
-    st.subheader("Model Parameters")
-    n_estimators = st.slider("Number of Estimators", 50, 200, 100)
-    learning_rate = st.slider("Learning Rate", 0.1, 1.0, 0.7)
-    max_depth = st.slider("Max Depth", 2, 10, 3)
-
-# Main content
-col1, col2 = st.columns(2)
-
+# --- Header ---
+col1, col2 = st.columns([1, 4])
 with col1:
-    st.header("📊 Data Loading")
-    
-    with st.spinner(f"Loading {selected_race['name']} session data..."):
-        try:
-            laps_2024 = load_session_data(race_name=selected_race['name'])
-            sector_times_2024 = aggregate_sector_times(laps_2024)
-            st.success(f"✅ Loaded data for {len(laps_2024['Driver'].unique())} drivers")
-        except Exception as e:
-            st.error(f"Error loading session data: {e}")
-            st.stop()
-
+    st.title("🏎️")
 with col2:
-    st.header("🌤️ Weather & Qualifying Data")
+    st.markdown("<h1 class='f1-header'>F1 STRATEGY AI <span style='color:white; font-size:0.5em'>PRO</span></h1>", unsafe_allow_html=True)
+    st.caption("Advanced Predictive Analytics & Monte Carlo Simulation Engine")
+
+# --- Tabs Structure ---
+tab_control, tab_telemetry, tab_simulation = st.tabs(["🏁 Race Control", "📊 Telemetry Dashboard", "🔮 Monte Carlo Analysis"])
+
+# --- Session State Management ---
+if 'predictor' not in st.session_state:
+    st.session_state.predictor = None
+if 'simulation_data' not in st.session_state:
+    st.session_state.simulation_data = None
+if 'mc_results' not in st.session_state:
+    st.session_state.mc_results = None
+
+# ==============================================================================
+# TAB 1: RACE CONTROL
+# ==============================================================================
+with tab_control:
+    col_setup, col_strategy = st.columns([1, 1])
     
-    with st.spinner(f"Preparing {selected_race['name']} qualifying data..."):
-        qualifying_2025, rain_probability, temperature = prepare_qualifying_data(selected_race['name'])
+    with col_setup:
+        st.subheader("📍 Grand Prix Setup")
         
-        st.metric("Rain Probability", f"{rain_probability*100:.0f}%")
-        st.metric("Temperature", f"{temperature:.1f}°C")
+        race_options = [race["name"] for race in RACE_SCHEDULE]
+        selected_race_name = st.selectbox("Select Circuit", options=race_options, index=7) # Monaco default
+        selected_race = next((race for race in RACE_SCHEDULE if race["name"] == selected_race_name), RACE_SCHEDULE[7])
+        
+        st.info(f"**{selected_race['name']}** | Round {selected_race['round']} | {selected_race['date']}")
+        
+        st.subheader("🌤️ Environmental Conditions")
+        rain_override = st.slider("Rain Probability (%)", 0, 100, 0, 5) / 100.0
+        temp_override = st.slider("Track Temperature (°C)", 10, 60, 25, 1)
+        weather_override = (rain_override, float(temp_override))
 
-# Model training and prediction
-st.header("🤖 Model Training & Predictions")
+        api_key = st.text_input("Weather API Key", value=WEATHER_API_KEY if WEATHER_API_KEY != "YOURAPIKEY" else "", type="password")
 
-if st.button("Run Prediction", type="primary"):
-    with st.spinner("Training model and making predictions..."):
-        # Initialize predictor
-        predictor = F1RacePredictor()
-        predictor.model.n_estimators = n_estimators
-        predictor.model.learning_rate = learning_rate
-        predictor.model.max_depth = max_depth
+    with col_strategy:
+        st.subheader("🏎️ Driver & Strategy Config")
         
-        # Prepare data
-        merged_data, X, y = predictor.prepare_data(
-            qualifying_2025, sector_times_2024, laps_2024, 
-            rain_probability, temperature
-        )
-        
-        # Train and predict
-        predictions, mae = predictor.train_and_predict(X, y)
-        merged_data["PredictedRaceTime (s)"] = predictions
-        
-        # Sort results
-        final_results = merged_data.sort_values("PredictedRaceTime (s)").reset_index(drop=True)
-        
-        # Display results
-        col1, col2, col3 = st.columns([2, 1, 1])
-        
-        with col1:
-            st.subheader("🏁 Predicted Race Results")
+        with st.expander("⏱️ Pace & Quali Adjustments", expanded=False):
+            st.caption("Fine-tune driver performance relative to baseline.")
             
-            # Create podium display
-            podium = final_results.head(3)
-            st.markdown("### 🏆 Podium Finishers")
+            # Deep copy data to avoid mutating original
+            qualifying_override = {k: v[:] for k, v in QUALIFYING_2025_DATA.items()}
+            race_pace_override = CLEAN_AIR_RACE_PACE.copy()
             
-            medals = ["🥇", "🥈", "🥉"]
-            for i, (_, driver_data) in enumerate(podium.iterrows()):
-                st.markdown(f"{medals[i]} **P{i+1}: {driver_data['Driver']}** - {driver_data['PredictedRaceTime (s)']:.2f}s")
+            drivers_list = QUALIFYING_2025_DATA["Driver"]
+            tabs_drivers = st.tabs(["Top Teams", "Midfield"])
             
-            # Full results table
-            st.markdown("### Full Results")
-            results_df = final_results[["Driver", "Team", "PredictedRaceTime (s)"]].copy()
-            results_df.index = range(1, len(results_df) + 1)
-            results_df.index.name = "Position"
-            st.dataframe(results_df, use_container_width=True)
-        
-        with col2:
-            st.subheader("📈 Model Performance")
-            st.metric("Model Error (MAE)", f"{mae:.2f} seconds")
+            top_teams = ["VER", "NOR", "LEC", "HAM", "SAI", "PIA", "RUS", "ALO"]
             
-            # Feature importance
-            st.markdown("### Feature Importance")
-            feature_importance = predictor.get_feature_importance()
-            fi_df = pd.DataFrame(
-                list(feature_importance.items()), 
-                columns=["Feature", "Importance"]
-            ).sort_values("Importance", ascending=False)
-            st.dataframe(fi_df, use_container_width=True)
-        
-        with col3:
-            st.subheader("🎯 Key Insights")
-            
-            # Fastest predicted time
-            fastest = final_results.iloc[0]
-            st.info(f"**Fastest Predicted Time:** {fastest['PredictedRaceTime (s)']:.2f}s")
-            
-            # Time gap to leader
-            time_gaps = final_results["PredictedRaceTime (s)"] - fastest["PredictedRaceTime (s)"]
-            avg_gap = time_gaps[1:].mean()
-            st.info(f"**Average Gap to Leader:** {avg_gap:.2f}s")
-            
-            # Closest battle
-            gaps_between = final_results["PredictedRaceTime (s)"].diff()[1:]
-            min_gap_idx = gaps_between.idxmin()
-            st.info(f"**Closest Battle:** P{min_gap_idx} vs P{min_gap_idx+1} ({gaps_between[min_gap_idx]:.3f}s)")
+            with tabs_drivers[0]:
+                for driver in top_teams:
+                    if driver in drivers_list:
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            pace_delta = st.number_input(f"{driver} Pace (s)", -2.0, 2.0, 0.0, 0.05, key=f"p_{driver}")
+                            race_pace_override[driver] += pace_delta
+                        with c2:
+                            idx = drivers_list.index(driver)
+                            curr_q = QUALIFYING_2025_DATA["QualifyingTime (s)"][idx]
+                            if curr_q:
+                                q_delta = st.number_input(f"{driver} Quali (s)", -2.0, 2.0, 0.0, 0.05, key=f"q_{driver}")
+                                qualifying_override["QualifyingTime (s)"][idx] = curr_q + q_delta
 
-# Visualization section
-st.header("📊 Visualizations")
+        with st.expander("♟️ Tyre Strategy", expanded=True):
+            st.caption("Starting compound affects initial pace vs degradation.")
+            tyre_strategy = {}
+            cols_tyre = st.columns(4)
+            key_drivers = ["VER", "NOR", "LEC", "HAM", "SAI", "PIA", "RUS", "ALO"]
+            
+            for i, driver in enumerate(key_drivers):
+                with cols_tyre[i % 4]:
+                    tyre = st.selectbox(f"{driver}", ["Soft", "Medium", "Hard"], index=1, key=f"t_{driver}", label_visibility="collapsed")
+                    st.caption(driver)
+                    tyre_strategy[driver] = tyre
 
-if 'final_results' in locals():
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Clean air race pace effect
-        fig1, ax1 = plt.subplots(figsize=(10, 6))
-        scatter = ax1.scatter(
-            final_results["CleanAirRacePace (s)"], 
-            final_results["PredictedRaceTime (s)"],
-            c=range(len(final_results)),
-            cmap='viridis',
-            s=100
-        )
+    st.markdown("---")
+    if st.button("🚀 INITIALIZE SIMULATION", type="primary", use_container_width=True):
+        with st.spinner("Loading telemetry, configuring physics engine..."):
+            try:
+                laps_2024, results_2024 = load_session_data(race_name=selected_race['name'])
+                sector_times_2024 = aggregate_sector_times(laps_2024)
+                
+                qualifying_2025, rain_prob, temp = prepare_qualifying_data(
+                    selected_race['name'], 
+                    qualifying_override=qualifying_override,
+                    race_pace_override=race_pace_override,
+                    weather_override=weather_override,
+                    target_date=selected_race['date'],
+                    tyre_strategy=tyre_strategy
+                )
+                
+                predictor = F1RacePredictor()
+                
+                merged_data, X, y = predictor.prepare_data(
+                    qualifying_2025, sector_times_2024, laps_2024, results_2024,
+                    rain_prob, temp
+                )
+                
+                # Train Model (Baseline)
+                base_preds, mae = predictor.train_and_predict(X, y)
+                merged_data["PredictedPosition"] = base_preds
+                
+                st.session_state.predictor = predictor
+                st.session_state.simulation_data = (merged_data, X, y)
+                st.session_state.mae = mae
+                st.session_state.rain_prob = rain_prob
+                
+                st.success(f"✅ Simulation Initialized! Baseline MAE: {mae:.2f} positions")
+                
+            except Exception as e:
+                st.error(f"Initialization Failed: {e}")
+                st.exception(e)
+
+# ==============================================================================
+# TAB 2: TELEMETRY DASHBOARD
+# ==============================================================================
+with tab_telemetry:
+    if st.session_state.simulation_data is None:
+        st.warning("⚠️ Please Initialize Simulation in 'Race Control' first.")
+    else:
+        merged_data, X, y = st.session_state.simulation_data
+        predictor = st.session_state.predictor
         
-        for i, driver in enumerate(final_results["Driver"]):
-            ax1.annotate(
-                driver, 
-                (final_results["CleanAirRacePace (s)"].iloc[i], 
-                 final_results["PredictedRaceTime (s)"].iloc[i]),
-                xytext=(5, 5), 
-                textcoords='offset points',
-                fontsize=8
+        st.header("📊 Telemetry Analysis")
+        
+        c1, c2 = st.columns([2, 1])
+        
+        with c1:
+            st.subheader("Predicted Finishing Order (Baseline)")
+            final_results = merged_data.sort_values("PredictedPosition")
+            
+            fig_order = px.bar(
+                final_results,
+                x="Driver",
+                y="PredictedPosition",
+                color="PredictedPosition",
+                color_continuous_scale="RdYlGn_r",
+                text_auto='.1f',
+                title="Predicted Position Score (Lower is Better)"
             )
+            fig_order.update_layout(xaxis_title="Driver", yaxis_title="Position Score")
+            st.plotly_chart(fig_order, use_container_width=True)
+            
+        with c2:
+            st.subheader("Model Insights")
+            st.metric("Rain Probability", f"{st.session_state.rain_prob:.0%}")
+            st.metric("Model Uncertainty", f"±{st.session_state.mae:.1f} pos")
+            
+            imp = predictor.get_feature_importance()
+            df_imp = pd.DataFrame(list(imp.items()), columns=["Feature", "Value"]).sort_values("Value")
+            fig_imp = px.bar(df_imp, x="Value", y="Feature", orientation='h', title="Factor Weighting")
+            fig_imp.update_layout(height=300, showlegend=False)
+            st.plotly_chart(fig_imp, use_container_width=True)
+
+# ==============================================================================
+# TAB 3: MONTE CARLO ANALYSIS
+# ==============================================================================
+with tab_simulation:
+    if st.session_state.simulation_data is None:
+        st.warning("⚠️ Please Initialize Simulation in 'Race Control' first.")
+    else:
+        merged_data, X, y = st.session_state.simulation_data
+        predictor = st.session_state.predictor
+        drivers = merged_data["Driver"]
         
-        ax1.set_xlabel("Clean Air Race Pace (s)")
-        ax1.set_ylabel("Predicted Race Time (s)")
-        ax1.set_title("Effect of Clean Air Race Pace on Predicted Results")
-        plt.colorbar(scatter, ax=ax1, label="Finishing Position")
-        st.pyplot(fig1)
-    
-    with col2:
-        # Feature importance bar chart
-        fig2, ax2 = plt.subplots(figsize=(10, 6))
-        feature_importance = predictor.get_feature_importance()
-        features = list(feature_importance.keys())
-        importances = list(feature_importance.values())
+        st.header("🔮 Monte Carlo Simulation")
+        st.markdown("""
+        **Methodology:** This engine runs **1,000** race simulations. In each iteration, it introduces Gaussian noise to:
+        1.  **Race Pace** (Simulating driver consistency, traffic, errors)
+        2.  **Pit Stops** (Simulating crew performance and strategy calls)
+        """)
         
-        bars = ax2.barh(features, importances, color='skyblue')
-        ax2.set_xlabel("Importance")
-        ax2.set_title("Feature Importance in Race Time Prediction")
+        if st.button("🎰 RUN 1,000 SIMULATIONS", type="primary"):
+            with st.spinner("Simulating 1,000 parallel universes..."):
+                mc_results = predictor.monte_carlo_predict(X, drivers, n_simulations=1000)
+                st.session_state.mc_results = mc_results
+                st.success("Analysis Complete!")
         
-        # Add value labels on bars
-        for bar, importance in zip(bars, importances):
-            ax2.text(bar.get_width(), bar.get_y() + bar.get_height()/2, 
-                    f'{importance:.3f}', 
-                    ha='left', va='center', fontsize=9)
-        
-        plt.tight_layout()
-        st.pyplot(fig2)
-    
-    # Time gaps visualization
-    st.subheader("⏱️ Time Gaps Visualization")
-    
-    fig3, ax3 = plt.subplots(figsize=(12, 8))
-    positions = range(1, len(final_results) + 1)
-    time_to_leader = final_results["PredictedRaceTime (s)"] - final_results["PredictedRaceTime (s)"].iloc[0]
-    
-    bars = ax3.barh(positions, time_to_leader, color='lightcoral')
-    ax3.set_yticks(positions)
-    ax3.set_yticklabels([f"P{i}: {driver}" for i, driver in zip(positions, final_results["Driver"])])
-    ax3.set_xlabel("Time Behind Leader (seconds)")
-    ax3.set_title("Time Gaps to Race Leader")
-    ax3.invert_yaxis()
-    
-    # Add time labels
-    for bar, time_gap in zip(bars, time_to_leader):
-        if time_gap > 0:
-            ax3.text(bar.get_width() + 0.1, bar.get_y() + bar.get_height()/2, 
-                    f'+{time_gap:.2f}s', 
-                    ha='left', va='center', fontsize=9)
-    
-    plt.tight_layout()
-    st.pyplot(fig3)
+        if st.session_state.mc_results is not None:
+            mc_df = st.session_state.mc_results
+            
+            winner = mc_df.iloc[0]
+            
+            col_win, col_podium, col_cons = st.columns(3)
+            with col_win:
+                st.markdown("<div class='stat-box'>", unsafe_allow_html=True)
+                st.metric("Most Likely Winner", winner['Driver'], f"{winner['Win Probability']:.1%} Prob")
+                st.markdown("</div>", unsafe_allow_html=True)
+            
+            with col_podium:
+                st.markdown("<div class='stat-box'>", unsafe_allow_html=True)
+                podium_contenders = mc_df[mc_df['Podium Probability'] > 0.3]['Driver'].tolist()
+                st.write("**High Podium Probability:**")
+                st.write(", ".join(podium_contenders))
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            # Win Probability Chart
+            st.subheader("🏆 Win Probability Distribution")
+            
+            # Filter reasonable contenders
+            contenders = mc_df[mc_df['Win Probability'] > 0.01]
+            
+            fig_win = px.pie(
+                contenders, 
+                values='Win Probability', 
+                names='Driver', 
+                title='Championship Probability',
+                hole=0.4,
+                color_discrete_sequence=px.colors.sequential.RdBu
+            )
+            st.plotly_chart(fig_win, use_container_width=True)
+            
+            # Confidence Intervals (Candlestick/Box-like)
+            st.subheader("📊 Performance Confidence Intervals (P5 - Avg - P95)")
+            
+            fig_conf = go.Figure()
+            
+            mc_df_sorted = mc_df.sort_values("Avg Finish")
+            
+            fig_conf.add_trace(go.Scatter(
+                x=mc_df_sorted['Driver'], 
+                y=mc_df_sorted['Avg Finish'],
+                mode='markers',
+                name='Average Finish',
+                marker=dict(color='white', size=8)
+            ))
+            
+            for i, row in mc_df_sorted.iterrows():
+                fig_conf.add_trace(go.Scatter(
+                    x=[row['Driver'], row['Driver']],
+                    y=[row['Best Case (P5)'], row['Worst Case (P95)']],
+                    mode='lines',
+                    line=dict(color='#FF1801', width=3),
+                    showlegend=False
+                ))
+            
+            fig_conf.update_layout(
+                title="Driver Finishing Range (5th to 95th Percentile)",
+                yaxis_title="Position (Lower is Better)",
+                yaxis=dict(autorange="reversed"),
+                template="plotly_dark"
+            )
+            st.plotly_chart(fig_conf, use_container_width=True)
+            
+            st.subheader("📄 Detailed Simulation Data")
+            st.dataframe(mc_df.style.format({
+                "Win Probability": "{:.1%}",
+                "Podium Probability": "{:.1%}",
+                "Avg Finish": "{:.2f}",
+                "Best Case (P5)": "{:.0f}",
+                "Worst Case (P95)": "{:.0f}"
+            }), use_container_width=True)
+
 
 # Footer
 st.markdown("---")
