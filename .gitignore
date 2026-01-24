@@ -38,9 +38,9 @@ ehthumbs.db
 Icon?
 .Origin/
 
-# Cache directory - include directory but not contents
-f1_cache/*
-!f1_cache/.gitkeep
+# directory
+f1_cache/
+data/seasons
 
 # Tests
 tests/

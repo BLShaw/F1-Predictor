@@ -1,7 +1,0 @@
-{
-    "TYRE_DEGRADATION": {
-        "Soft": 0.15,
-        "Medium": 0.08,
-        "Hard": 0.04
-    }
-}

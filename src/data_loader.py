@@ -1,191 +1,346 @@
-import fastf1
-import pandas as pd
-import requests
+"""
+This module provides functions to load session data from JSON files
+organized by season and Grand Prix.
+"""
+
+import json
 import logging
-from datetime import datetime
-from typing import Tuple, Optional, Dict, List, Any
-from .config import *
+from pathlib import Path
+from typing import Optional, Dict, List, Any, Tuple
+import pandas as pd
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-fastf1.Cache.enable_cache(CACHE_DIR)
+# Data directories
+DATA_DIR = Path(__file__).parent.parent / "data"
+SEASONS_DIR = DATA_DIR / "seasons"
 
-def load_session_data(year: int = 2024, race_name: Optional[str] = None, race_number: Optional[int] = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Load F1 session data and process lap times"""
-    if race_name:
-        session = fastf1.get_session(year, race_name, "R")
-    elif race_number:
-        session = fastf1.get_session(year, race_number, "R")
-    else:
-        # Default to Monaco if no race is specified
-        session = fastf1.get_session(year, "Monaco", "R")
+
+def get_available_seasons() -> List[int]:
+    """Get list of seasons with data available."""
+    if not SEASONS_DIR.exists():
+        return []
     
-    session.load()
+    seasons = []
+    for folder in SEASONS_DIR.iterdir():
+        if folder.is_dir() and folder.name.isdigit():
+            seasons.append(int(folder.name))
     
-    laps = session.laps[["Driver", "LapTime", "Sector1Time", "Sector2Time", "Sector3Time"]].copy()
-    laps.dropna(inplace=True)
+    return sorted(seasons, reverse=True)
+
+
+def get_season_schedule(year: int) -> List[Dict]:
+    """Load season schedule from JSON."""
+    schedule_path = SEASONS_DIR / str(year) / "schedule.json"
     
-    # Convert times to seconds
-    for col in ["LapTime", "Sector1Time", "Sector2Time", "Sector3Time"]:
-        laps[f"{col} (s)"] = laps[col].dt.total_seconds()
+    if schedule_path.exists():
+        with open(schedule_path, 'r') as f:
+            return json.load(f)
+    
+    return []
+
+
+def get_available_gps(year: int) -> List[Dict]:
+    """
+    Get list of GPs with data for a season.
+    
+    Returns:
+        List of dicts with round, name, folder, and available sessions
+    """
+    season_path = SEASONS_DIR / str(year)
+    
+    if not season_path.exists():
+        return []
+    
+    gps = []
+    for folder in sorted(season_path.iterdir()):
+        if folder.is_dir() and not folder.name.startswith("."):
+            # Parse folder name (e.g., "01_Bahrain_GP")
+            parts = folder.name.split("_", 1)
+            if len(parts) == 2 and parts[0].isdigit():
+                round_num = int(parts[0])
+                gp_name = parts[1].replace("_", " ")
+                
+                # Check which sessions are available
+                sessions = get_available_sessions(year, folder.name)
+                
+                gps.append({
+                    "round": round_num,
+                    "name": gp_name,
+                    "folder": folder.name,
+                    "sessions": sessions
+                })
+    
+    return sorted(gps, key=lambda x: x["round"])
+
+
+def get_available_sessions(year: int, gp_folder: str) -> Dict[str, bool]:
+    """Check which session JSON files exist for a GP."""
+    gp_path = SEASONS_DIR / str(year) / gp_folder
+    
+    session_files = {
+        "fp1": "fp1.json",
+        "fp2": "fp2.json",
+        "fp3": "fp3.json",
+        "qualifying": "qualifying.json",
+        "sprint_qualifying": "sprint_qualifying.json",
+        "sprint_shootout": "sprint_shootout.json",
+        "sprint": "sprint.json",
+        "race": "race.json"
+    }
+    
+    available = {}
+    for session_name, filename in session_files.items():
+        available[session_name] = (gp_path / filename).exists()
+    
+    return available
+
+
+def load_session(year: int, gp_folder: str, session_type: str) -> Optional[Dict]:
+    """
+    Load a single session from JSON file.
+    
+    Args:
+        year: Season year
+        gp_folder: GP folder name (e.g., "01_Bahrain_GP")
+        session_type: One of fp1, fp2, fp3, qualifying, sprint, race
+    
+    Returns:
+        Session data dictionary or None
+    """
+    gp_path = SEASONS_DIR / str(year) / gp_folder
+    session_path = gp_path / f"{session_type}.json"
+    
+    if session_path.exists():
+        with open(session_path, 'r') as f:
+            return json.load(f)
+    
+    return None
+
+
+def load_gp_data(year: int, gp_folder: str) -> Dict[str, Any]:
+    """
+    Load all available session data for a GP.
+    
+    Returns:
+        Dict with session_type: session_data for all available sessions
+    """
+    sessions = get_available_sessions(year, gp_folder)
+    
+    gp_data = {
+        "year": year,
+        "gp_folder": gp_folder,
+        "sessions": {}
+    }
+    
+    for session_type, is_available in sessions.items():
+        if is_available:
+            gp_data["sessions"][session_type] = load_session(year, gp_folder, session_type)
+    
+    # Load metadata if available
+    metadata_path = SEASONS_DIR / str(year) / gp_folder / "metadata.json"
+    if metadata_path.exists():
+        with open(metadata_path, 'r') as f:
+            gp_data["metadata"] = json.load(f)
+    
+    return gp_data
+
+
+def get_driver_best_times(session_data: Dict) -> Dict[str, float]:
+    """Extract best lap times per driver from session data."""
+    if not session_data or "best_times" not in session_data:
+        return {}
+    return session_data.get("best_times", {})
+
+
+def get_qualifying_results(session_data: Dict) -> pd.DataFrame:
+    """Convert qualifying session to DataFrame with Q1/Q2/Q3 times."""
+    if not session_data or "results" not in session_data:
+        return pd.DataFrame()
+    
+    return pd.DataFrame(session_data["results"])
+
+
+def get_race_results(session_data: Dict) -> pd.DataFrame:
+    """Convert race session to DataFrame with results."""
+    if not session_data or "results" not in session_data:
+        return pd.DataFrame()
+    
+    return pd.DataFrame(session_data["results"])
+
+
+def get_session_laps(session_data: Dict) -> pd.DataFrame:
+    """Convert session laps to DataFrame."""
+    if not session_data or "laps" not in session_data:
+        return pd.DataFrame()
+    
+    return pd.DataFrame(session_data["laps"])
+
+
+def aggregate_practice_pace(gp_data: Dict) -> pd.DataFrame:
+    """
+    Aggregate pace data from all practice sessions.
+    
+    Returns DataFrame with driver best times from FP1, FP2, FP3.
+    """
+    practice_sessions = ["fp1", "fp2", "fp3"]
+    pace_data = {}
+    
+    for session_type in practice_sessions:
+        if session_type in gp_data.get("sessions", {}):
+            session = gp_data["sessions"][session_type]
+            best_times = get_driver_best_times(session)
+            
+            for driver, time in best_times.items():
+                if driver not in pace_data:
+                    pace_data[driver] = {}
+                pace_data[driver][session_type] = time
+    
+    # Convert to DataFrame
+    if pace_data:
+        df = pd.DataFrame.from_dict(pace_data, orient="index")
+        df.index.name = "driver"
         
-    # Get race results for ground truth
-    results = session.results[["Abbreviation", "Position"]].copy()
-    results.rename(columns={"Abbreviation": "Driver"}, inplace=True)
+        # Get available practice columns
+        available_cols = [c for c in practice_sessions if c in df.columns]
+        
+        # Calculate overall best and average (only from available sessions)
+        if available_cols:
+            df["best"] = df[available_cols].min(axis=1)
+            df["avg"] = df[available_cols].mean(axis=1)
+        else:
+            # No valid columns, return empty
+            return pd.DataFrame()
+        
+        return df.reset_index()
     
-    return laps, results
+    return pd.DataFrame()
 
-def aggregate_sector_times(laps: pd.DataFrame) -> pd.DataFrame:
-    """Aggregate sector times by driver"""
-    sector_times = laps.groupby("Driver").agg({
-        "Sector1Time (s)": "mean",
-        "Sector2Time (s)": "mean",
-        "Sector3Time (s)": "mean"
-    }).reset_index()
+
+def get_historical_gp_data(gp_name: str, years: List[int] = None) -> List[Dict]:
+    """
+    Load historical data for a specific GP across multiple years.
+    Useful for predictions based on track-specific history.
     
-    sector_times["TotalSectorTime (s)"] = (
-        sector_times["Sector1Time (s)"] +
-        sector_times["Sector2Time (s)"] +
-        sector_times["Sector3Time (s)"]
+    Args:
+        gp_name: Name to match (partial match supported)
+        years: List of years to search (default: all available)
+    
+    Returns:
+        List of GP data dicts from matching events
+    """
+    if years is None:
+        years = get_available_seasons()
+    
+    historical_data = []
+    
+    for year in years:
+        gps = get_available_gps(year)
+        for gp in gps:
+            if gp_name.lower() in gp["name"].lower():
+                gp_data = load_gp_data(year, gp["folder"])
+                gp_data["match_year"] = year
+                gp_data["match_name"] = gp["name"]
+                historical_data.append(gp_data)
+    
+    return historical_data
+
+
+def load_static_data() -> Dict[str, Any]:
+    """Load static data files (only tracks.json remains)."""
+    static_data = {}
+    
+    # Only tracks.json is needed - driver/team info comes from FastF1
+    tracks_path = DATA_DIR / "tracks.json"
+    if tracks_path.exists():
+        with open(tracks_path, 'r') as f:
+            static_data["tracks"] = json.load(f)
+    
+    return static_data
+
+
+def get_drivers_from_session(session_data: Dict) -> pd.DataFrame:
+    """
+    Extract driver information from session results.
+    This replaces the need for static drivers.json.
+    """
+    if not session_data or "results" not in session_data:
+        return pd.DataFrame()
+    
+    results = pd.DataFrame(session_data["results"])
+    
+    if results.empty:
+        return pd.DataFrame()
+    
+    # Extract driver columns
+    driver_cols = ["driver", "driver_number", "team"]
+    available_cols = [c for c in driver_cols if c in results.columns]
+    
+    return results[available_cols].drop_duplicates()
+
+
+def get_teams_from_session(session_data: Dict) -> pd.DataFrame:
+    """
+    Extract team information from session results.
+    This replaces the need for static teams.json.
+    """
+    if not session_data or "results" not in session_data:
+        return pd.DataFrame()
+    
+    results = pd.DataFrame(session_data["results"])
+    
+    if results.empty or "team" not in results.columns:
+        return pd.DataFrame()
+    
+    return results[["team"]].drop_duplicates()
+
+
+# Backward compatibility functions
+def prepare_features_from_gp(gp_data: Dict, target_session: str = "race") -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Prepare features and target for ML model from GP data.
+    
+    Uses practice and qualifying data to predict race results.
+    """
+    # Get practice pace
+    practice_pace = aggregate_practice_pace(gp_data)
+    
+    # Get qualifying results
+    quali_data = None
+    if "qualifying" in gp_data.get("sessions", {}):
+        quali_data = get_qualifying_results(gp_data["sessions"]["qualifying"])
+    
+    # Get target (race results)
+    target = None
+    if target_session in gp_data.get("sessions", {}):
+        target = get_race_results(gp_data["sessions"][target_session])
+    
+    if practice_pace.empty or quali_data is None or quali_data.empty:
+        return pd.DataFrame(), pd.DataFrame()
+    
+    # Merge features - check which columns exist
+    quali_cols = ["driver"]
+    if "position" in quali_data.columns:
+        quali_cols.append("position")
+    for qcol in ["q1", "q2", "q3"]:
+        if qcol in quali_data.columns:
+            quali_cols.append(qcol)
+    
+    rename_map = {"position": "quali_pos"} if "position" in quali_cols else {}
+    
+    features = practice_pace.merge(
+        quali_data[quali_cols].rename(columns=rename_map),
+        on="driver",
+        how="inner"
     )
     
-    return sector_times
-
-def get_weather_data(track_name: str = "Monaco", target_date: Optional[str] = None, api_key: Optional[str] = None) -> Tuple[float, float]:
-    """Fetch weather data for a specific track"""
-    if api_key is None:
-        api_key = WEATHER_API_KEY
+    # Prepare target if race data available
+    if target is not None and not target.empty:
+        features = features.merge(
+            target[["driver", "position"]].rename(columns={"position": "race_pos"}),
+            on="driver",
+            how="inner"
+        )
     
-    # Check if API key is valid (not default placeholder)
-    if not api_key or api_key == "YOURAPIKEY":
-        logger.warning(f"No valid API key provided for {track_name}, using historical averages.")
-        return 0.0, 20.0
-    
-    if track_name not in TRACK_COORDINATES:
-        logger.warning(f"Track {track_name} not found in coordinates, defaulting to Monaco.")
-        track_name = "Monaco"
-        
-    lat = TRACK_COORDINATES[track_name]["lat"]
-    lon = TRACK_COORDINATES[track_name]["lon"]
-    
-    weather_url = f"http://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={api_key}&units=metric"
-    
-    try:
-        response = requests.get(weather_url, timeout=5)
-        
-        if response.status_code != 200:
-            logger.error(f"Weather API returned status {response.status_code}: {response.text}")
-            return 0.0, 20.0
-            
-        weather_data = response.json()
-        
-        # Find forecast closest to target date/time
-        # If no target_date, use default FORECAST_TIME
-        target = target_date if target_date else FORECAST_TIME
-        
-        # Simple match: look for the date string in the forecast timestamp
-        # In a real app, we'd use datetime objects for closer matching
-        forecast_data = next((f for f in weather_data["list"] if target.split(' ')[0] in f["dt_txt"]), None)
-        
-        # Fallback: if specific date not found (e.g. 2025 date vs current 5-day forecast), 
-        # just take the first item as a "current conditions" proxy if we are doing a live check,
-        # OR return defaults if we really wanted that specific future date.
-        # For this simulator, if we can't find the future date, let's default to benign conditions 
-        # so the user can use the sliders to override.
-        
-        if forecast_data:
-            rain_probability = float(forecast_data.get("pop", 0))
-            temperature = float(forecast_data["main"]["temp"])
-            return rain_probability, temperature
-        else:
-            logger.warning(f"No forecast found for target {target}, returning defaults.")
-            return 0.0, 20.0
-            
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Weather API connection failed: {e}")
-        return 0.0, 20.0
-    except (KeyError, IndexError, ValueError) as e:
-        logger.error(f"Weather data parsing error: {e}")
-        return 0.0, 20.0
-    except Exception as e:
-        logger.error(f"Unexpected error fetching weather: {e}")
-        return 0.0, 20.0
-
-def prepare_qualifying_data(
-    track_name: str = "Monaco", 
-    qualifying_override: Optional[Dict[str, List[Any]]] = None, 
-    race_pace_override: Optional[Dict[str, float]] = None, 
-    weather_override: Optional[Tuple[float, float]] = None,
-    target_date: Optional[str] = None,
-    tyre_strategy: Optional[Dict[str, str]] = None
-) -> Tuple[pd.DataFrame, float, float]:
-    """Prepare qualifying data with team performance scores, adjusted for track"""
-    # Use override if provided, else copy default to avoid mutating original
-    if qualifying_override:
-        qualifying_2025 = pd.DataFrame(qualifying_override)
-    else:
-        qualifying_2025 = pd.DataFrame(QUALIFYING_2025_DATA)
-        
-    pace_data = race_pace_override if race_pace_override else CLEAN_AIR_RACE_PACE
-    qualifying_2025["CleanAirRacePace (s)"] = qualifying_2025["Driver"].map(pace_data)
-    
-    # Apply Tyre Strategy Adjustments
-    if tyre_strategy:
-        # Heuristic: Pace adjustments relative to Medium
-        # Soft: Faster initial pace (-0.5s)
-        # Medium: Baseline (0.0s)
-        # Hard: Slower initial pace (+0.5s)
-        tyre_pace_deltas = {
-            "Soft": -0.5,
-            "Medium": 0.0,
-            "Hard": 0.5
-        }
-        
-        for driver, tyre in tyre_strategy.items():
-            if driver in qualifying_2025["Driver"].values:
-                delta = tyre_pace_deltas.get(tyre, 0.0)
-                # Apply delta to CleanAirRacePace
-                mask = qualifying_2025["Driver"] == driver
-                qualifying_2025.loc[mask, "CleanAirRacePace (s)"] += delta
-                logger.info(f"Applied {tyre} tyre strategy for {driver}: {delta:+.1f}s pace adjustment")
-
-    max_points = max(TEAM_POINTS.values())
-    team_performance_score = {team: points / max_points for team, points in TEAM_POINTS.items()}
-    
-    qualifying_2025["Team"] = qualifying_2025["Driver"].map(DRIVER_TO_TEAM)
-    qualifying_2025["TeamPerformanceScore"] = qualifying_2025["Team"].map(team_performance_score)
-    
-    # Use track-specific position change if available, otherwise use default
-    if track_name in TRACK_SPECIFIC_POSITION_CHANGE:
-        position_changes = TRACK_SPECIFIC_POSITION_CHANGE[track_name]
-    else:
-        position_changes = AVERAGE_POSITION_CHANGE
-    
-    qualifying_2025["AveragePositionChange"] = qualifying_2025["Driver"].map(position_changes)
-    
-    track_stats = TRACK_CHARACTERISTICS.get(track_name, {"Downforce": 3, "PitLoss": 22.0})
-    qualifying_2025["TrackDownforce"] = track_stats["Downforce"]
-    qualifying_2025["PitLossTime"] = track_stats["PitLoss"]
-    
-    if weather_override:
-        rain_probability, temperature = weather_override
-    else:
-        rain_probability, temperature = get_weather_data(track_name, target_date=target_date)
-    
-    # Wet Weather Logic
-    # 15% pace penalty if rain probability is high (> 50%)
-    WET_PACE_PENALTY = 1.15
-    
-    if rain_probability > 0.50:
-        logger.info(f"Wet weather detected ({rain_probability:.0%}), applying {WET_PACE_PENALTY}x pace penalty.")
-        qualifying_2025["CleanAirRacePace (s)"] = qualifying_2025["CleanAirRacePace (s)"] * WET_PACE_PENALTY
-        
-        # Wet Qualifying: Times are slower
-        # Simple heuristic: add 10% to qualifying times
-        qualifying_2025["QualifyingTime"] = qualifying_2025["QualifyingTime (s)"] * 1.10
-    else:
-        qualifying_2025["QualifyingTime"] = qualifying_2025["QualifyingTime (s)"]
-    
-    return qualifying_2025, rain_probability, temperature
+    return features, target
