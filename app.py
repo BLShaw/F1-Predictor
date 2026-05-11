@@ -684,7 +684,7 @@ def main():
                     if st.checkbox("Sprint", value=False, key="season_s"): season_sessions.append("S")
                     if st.checkbox("Race", value=True, key="season_r"): season_sessions.append("R")
                 
-                if st.button("🚀 DOWNLOAD SEASON", use_container_width=True, type="primary", key="btn_season"):
+                if st.button("🚀 DOWNLOAD SEASON", width="stretch", type="primary", key="btn_season"):
                     if not season_sessions:
                         st.warning("Select at least one session type")
                     else:
@@ -800,7 +800,7 @@ def main():
                     if st.checkbox("Sprint", value=False, key="gp_s"): gp_sessions.append("S")
                     if st.checkbox("Race", value=True, key="gp_r"): gp_sessions.append("R")
                 
-                if st.button("🚀 DOWNLOAD GP", use_container_width=True, type="primary", key="btn_gp"):
+                if st.button("🚀 DOWNLOAD GP", width="stretch", type="primary", key="btn_gp"):
                     if not gp_identifier:
                         st.warning("Please select or enter a GP")
                     elif not gp_sessions:
@@ -861,7 +861,7 @@ def main():
                     key="session_type"
                 )
                 
-                if st.button("🚀 DOWNLOAD SESSION", use_container_width=True, type="primary", key="btn_session"):
+                if st.button("🚀 DOWNLOAD SESSION", width="stretch", type="primary", key="btn_session"):
                     if not session_gp_id:
                         st.warning("Please enter a GP name or round number")
                     else:
@@ -934,7 +934,7 @@ def main():
         col1, col2 = st.columns(2)
         
         with col1:
-            if st.button("REFRESH GP", use_container_width=True, type="primary"):
+            if st.button("REFRESH GP", width="stretch", type="primary"):
                 if selected_season and selected_gp:
                     with st.spinner("Refreshing GP data..."):
                         try:
@@ -948,7 +948,7 @@ def main():
                     st.warning("Select a GP first")
         
         with col2:
-            if st.button("CLEAR CACHE", use_container_width=True):
+            if st.button("CLEAR CACHE", width="stretch"):
                 cache_dir = Path("f1_cache")
                 if cache_dir.exists():
                     import shutil
@@ -992,7 +992,7 @@ def main():
                                    unsafe_allow_html=True)
                     else:
                         # Add fetch button for missing sessions
-                        if st.button(f"📥 {name}", key=f"fetch_{session_code}", use_container_width=True):
+                        if st.button(f"📥 {name}", key=f"fetch_{session_code}", width="stretch"):
                             with st.spinner(f"Fetching {name}..."):
                                 try:
                                     result = fetch_session(selected_season, selected_gp["round"], session_code)
@@ -1150,7 +1150,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
         if summary_data:
             st.dataframe(
                 pd.DataFrame(summary_data),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True
             )
         else:
@@ -1324,7 +1324,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                                     showlegend=False
                                 )
                                 
-                                st.plotly_chart(fig, use_container_width=True)
+                                st.plotly_chart(fig, width="stretch")
                                 
                                 # Detailed Table
                                 st.markdown(f"### 📋 {session_key.upper()} Lap Times")
@@ -1342,7 +1342,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                                     "gap": "Gap"
                                 })
                                 
-                                st.dataframe(display_df, use_container_width=True, hide_index=True)
+                                st.dataframe(display_df, width="stretch", hide_index=True)
                         else:
                             st.info(f"No lap time data available for {session_key.upper()}.")
                     else:
@@ -1361,7 +1361,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                 # Gap Chart
                 fig = create_qualifying_chart(quali_df)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                 
                 # Results Table
                 st.markdown("### 📋 Grid Positions")
@@ -1385,7 +1385,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                 cols_to_show = ["Pos", "Driver", "Team", "Q1", "Q2", "Q3"]
                 cols_to_show = [c for c in cols_to_show if c in display_df.columns]
                 
-                st.dataframe(display_df[cols_to_show], use_container_width=True, hide_index=True)
+                st.dataframe(display_df[cols_to_show], width="stretch", hide_index=True)
             else:
                 st.info("Qualifying results not available.")
         else:
@@ -1481,7 +1481,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                         cols_to_show = ["Pos", "Driver", "Team", "SQ1", "SQ2", "SQ3"]
                         cols_to_show = [c for c in cols_to_show if c in display_df.columns]
                         
-                        st.dataframe(display_df[cols_to_show], use_container_width=True, hide_index=True)
+                        st.dataframe(display_df[cols_to_show], width="stretch", hide_index=True)
                     
                     elif has_laps_only:
                         # Legacy format (2021-2022): Sprint Qualifying was determined by regular Qualifying
@@ -1517,7 +1517,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                             ])
                             times_df.insert(0, "Pos", range(1, len(times_df) + 1))
                             
-                            st.dataframe(times_df, use_container_width=True, hide_index=True)
+                            st.dataframe(times_df, width="stretch", hide_index=True)
                     else:
                         st.info("Sprint Qualifying results not available.")
                 else:
@@ -1600,7 +1600,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                         cols_to_show = ["Pos", "Driver", "Team", "Grid", "Status", "Points"]
                         cols_to_show = [c for c in cols_to_show if c in display_df.columns]
                         
-                        st.dataframe(display_df[cols_to_show], use_container_width=True, hide_index=True)
+                        st.dataframe(display_df[cols_to_show], width="stretch", hide_index=True)
                     else:
                         st.info("Sprint Race results not available.")
                 else:
@@ -1658,7 +1658,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                 cols_to_show = ["Pos", "Driver", "Team", "Grid", "Status", "Points"]
                 cols_to_show = [c for c in cols_to_show if c in display_df.columns]
                 
-                st.dataframe(display_df[cols_to_show], use_container_width=True, hide_index=True)
+                st.dataframe(display_df[cols_to_show], width="stretch", hide_index=True)
             else:
                 st.info("Race results not available.")
         else:
@@ -1763,7 +1763,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                     use_ml = st.checkbox("Use ML Model", value=True)
             
             # Generate Prediction Button
-            if st.button("🚀 RUN ML PREDICTION", type="primary", use_container_width=True):
+            if st.button("🚀 RUN ML PREDICTION", type="primary", width="stretch"):
                 with st.spinner("Running ML predictions and SHAP analysis..."):
                     try:
                         # Prepare features
@@ -1892,7 +1892,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                         showlegend=False
                     )
                     
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                     
                     # Full Results Table
                     st.markdown("#### 📋 Complete Prediction Results")
@@ -1904,7 +1904,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                     display_df["Exp. Points"] = display_df["Exp. Points"].round(2)
                     display_df["Avg Finish"] = display_df["Avg Finish"].round(1)
                     
-                    st.dataframe(display_df, use_container_width=True, hide_index=True)
+                    st.dataframe(display_df, width="stretch", hide_index=True)
                     
                     # Download
                     csv = predictions.to_csv(index=False)
@@ -1964,7 +1964,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                             margin=dict(l=150, r=60, t=60, b=40)
                         )
                         
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width="stretch")
                         
                         # Feature descriptions table
                         st.markdown("#### 📖 Feature Definitions")
@@ -1977,7 +1977,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                             {"Feature": "position_strength", "Description": "Combined weighted performance score", "Impact": "Lower = stronger performer"}
                         ])
                         
-                        st.dataframe(feature_desc, use_container_width=True, hide_index=True)
+                        st.dataframe(feature_desc, width="stretch", hide_index=True)
                     else:
                         st.info("🔄 Run prediction with 'Use XGBoost ML Model' enabled to see SHAP analysis.")
                 
@@ -2071,7 +2071,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                             if col != "driver" and display_feat[col].dtype in ['float64', 'float32']:
                                 display_feat[col] = display_feat[col].round(4)
                         
-                        st.dataframe(display_feat, use_container_width=True, hide_index=True)
+                        st.dataframe(display_feat, width="stretch", hide_index=True)
         
         else:
             st.warning("⚠️ Qualifying data is required for predictions. Please fetch the Qualifying session first.")
