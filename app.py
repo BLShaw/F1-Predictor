@@ -24,7 +24,6 @@ from src.data_loader import (
     aggregate_practice_pace,
     get_qualifying_results,
     get_race_results,
-    get_session_laps,
     get_drivers_from_session,
     load_static_data
 )
@@ -1424,7 +1423,7 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                     # Detect format: 2023+ has qualifying results (q1/q2/q3), 2021-2022 uses regular Qualifying
                     session_type = sprint_quali_data.get("session_type", "")
                     has_results = "results" in sprint_quali_data and sprint_quali_data["results"]
-                    has_laps_only = "laps" in sprint_quali_data and not has_results
+                    has_laps_only = ("laps" in sprint_quali_data or "best_times" in sprint_quali_data) and not has_results
                     
                     sq_results = get_qualifying_results(sprint_quali_data)
                     
@@ -1979,7 +1978,10 @@ python -m src.data_fetcher --year 2024 --gp Monaco
                         
                         st.dataframe(feature_desc, width="stretch", hide_index=True)
                     else:
-                        st.info("🔄 Run prediction with 'Use XGBoost ML Model' enabled to see SHAP analysis.")
+                        if ml_results and ml_results.get("shap_error"):
+                            st.error(f"SHAP calculation failed: {ml_results['shap_error']}")
+                        else:
+                            st.info("🔄 Run prediction with 'Use XGBoost ML Model' enabled to see SHAP analysis.")
                 
                 # Tab 3: Model Insights
                 with pred_tabs[2]:

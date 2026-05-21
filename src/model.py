@@ -322,13 +322,13 @@ class F1MLPredictor:
         # Calculate SHAP values if available
         shap_data = None
         feature_importance = None
+        shap_error = None
         
         if HAS_SHAP and self.model is not None:
             try:
-                # Use TreeExplainer for GradientBoosting (sklearn is supported)
-                self.shap_explainer = shap.Explainer(self.model, X)
-                shap_explanation = self.shap_explainer(X)
-                self.shap_values = shap_explanation.values
+                # Use TreeExplainer for GradientBoosting/RandomForest (sklearn is supported)
+                self.shap_explainer = shap.TreeExplainer(self.model)
+                self.shap_values = self.shap_explainer.shap_values(X, check_additivity=False)
                 
                 # Feature importance from SHAP
                 feature_importance = pd.DataFrame({
@@ -340,12 +340,15 @@ class F1MLPredictor:
                 # Per-driver SHAP contributions
                 shap_data = {
                     "values": self.shap_values,
-                    "base_value": shap_explanation.base_values[0] if hasattr(shap_explanation.base_values, '__iter__') else shap_explanation.base_values,
+                    "base_value": self.shap_explainer.expected_value[0] if isinstance(self.shap_explainer.expected_value, (list, np.ndarray)) else self.shap_explainer.expected_value,
                     "feature_names": self.feature_names,
                     "X": X
                 }
             except Exception as e:
+                shap_error = str(e)
                 print(f"SHAP calculation failed: {e}")
+        elif not HAS_SHAP:
+            shap_error = "SHAP library is not installed."
         
         # Run Monte Carlo simulation for probability estimation
         sim_ranks = np.zeros((n_sims, n_drivers))
@@ -401,6 +404,7 @@ class F1MLPredictor:
             "predictions": results_df,
             "feature_importance": feature_importance,
             "shap_data": shap_data,
+            "shap_error": shap_error,
             "features_used": features_df[self.feature_names + ["driver"]],
             "model_type": "Random Forest" if HAS_SKLEARN_GB else "Heuristic"
         }

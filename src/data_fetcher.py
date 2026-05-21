@@ -132,7 +132,7 @@ def fetch_session(year: int, gp: str, session_type: str) -> Optional[Dict]:
     try:
         logger.info(f"Fetching {session_type} for {gp} {year}...")
         session = fastf1.get_session(year, gp, session_type)
-        session.load()
+        session.load(telemetry=False, messages=False)
         
         # Get event info
         event = session.event
@@ -151,9 +151,8 @@ def fetch_session(year: int, gp: str, session_type: str) -> Optional[Dict]:
             "country": event.get("Country", ""),
         }
         
-        # Add laps data
+        # Extract best times from laps data (individual lap data is not saved as the app only uses best_times)
         if hasattr(session, 'laps') and session.laps is not None and not session.laps.empty:
-            session_data["laps"] = extract_lap_data(session.laps)
             
             # Calculate best times per driver
             best_times = {}
