@@ -1,0 +1,222 @@
+{
+  "session_type": "FP1",
+  "session_name": "Practice 1",
+  "year": 2025,
+  "round": 18,
+  "gp_name": "Singapore Grand Prix",
+  "date": "2025-10-03",
+  "track": "Marina Bay",
+  "country": "Singapore",
+  "best_times": {
+    "VER": 91.392,
+    "NOR": 91.698,
+    "BOR": 92.611,
+    "HAD": 91.755,
+    "GAS": 92.378,
+    "ANT": 92.399,
+    "ALO": 91.116,
+    "LEC": 91.266,
+    "STR": 93.034,
+    "TSU": 91.86,
+    "ALB": 117.029,
+    "HUL": 92.315,
+    "LAW": 92.461,
+    "OCO": 92.128,
+    "COL": 93.324,
+    "HAM": 91.48,
+    "SAI": 91.812,
+    "RUS": 92.139,
+    "PIA": 91.481,
+    "BEA": 92.538
+  },
+  "results": [
+    {
+      "position": null,
+      "driver": "VER",
+      "driver_number": 1,
+      "team": "Red Bull Racing",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "NOR",
+      "driver_number": 4,
+      "team": "McLaren",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "BOR",
+      "driver_number": 5,
+      "team": "Kick Sauber",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "HAD",
+      "driver_number": 6,
+      "team": "Racing Bulls",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "GAS",
+      "driver_number": 10,
+      "team": "Alpine",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "ANT",
+      "driver_number": 12,
+      "team": "Mercedes",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "ALO",
+      "driver_number": 14,
+      "team": "Aston Martin",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "LEC",
+      "driver_number": 16,
+      "team": "Ferrari",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "STR",
+      "driver_number": 18,
+      "team": "Aston Martin",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "TSU",
+      "driver_number": 22,
+      "team": "Red Bull Racing",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "ALB",
+      "driver_number": 23,
+      "team": "Williams",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "HUL",
+      "driver_number": 27,
+      "team": "Kick Sauber",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "LAW",
+      "driver_number": 30,
+      "team": "Racing Bulls",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "OCO",
+      "driver_number": 31,
+      "team": "Haas F1 Team",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "COL",
+      "driver_number": 43,
+      "team": "Alpine",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "HAM",
+      "driver_number": 44,
+      "team": "Ferrari",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "SAI",
+      "driver_number": 55,
+      "team": "Williams",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "RUS",
+      "driver_number": 63,
+      "team": "Mercedes",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "PIA",
+      "driver_number": 81,
+      "team": "McLaren",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "BEA",
+      "driver_number": 87,
+      "team": "Haas F1 Team",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    }
+  ],
+  "weather": {
+    "air_temp": 28.829268292682926,
+    "track_temp": 34.9719512195122,
+    "humidity": 74.40243902439025,
+    "rainfall": true,
+    "wind_speed": 1.904878048780488
+  },
+  "fetched_at": "2026-05-21T23:27:16.919055"
+}

@@ -1,0 +1,235 @@
+{
+  "session_type": "R",
+  "session_name": "Race",
+  "year": 2025,
+  "round": 12,
+  "gp_name": "British Grand Prix",
+  "date": "2025-07-06",
+  "track": "Silverstone",
+  "country": "United Kingdom",
+  "best_times": {
+    "VER": 90.179,
+    "GAS": 90.751,
+    "ANT": 99.336,
+    "ALO": 90.353,
+    "LEC": 90.819,
+    "STR": 92.088,
+    "TSU": 90.873,
+    "ALB": 90.047,
+    "HUL": 90.933,
+    "OCO": 90.818,
+    "NOR": 89.734,
+    "HAM": 90.016,
+    "BOR": 135.202,
+    "SAI": 90.645,
+    "HAD": 101.705,
+    "RUS": 90.869,
+    "PIA": 89.337,
+    "BEA": 90.921
+  },
+  "results": [
+    {
+      "position": 1,
+      "driver": "NOR",
+      "driver_number": 4,
+      "team": "McLaren",
+      "grid_position": 3,
+      "status": "Finished",
+      "points": 25.0,
+      "time": 5835.735
+    },
+    {
+      "position": 2,
+      "driver": "PIA",
+      "driver_number": 81,
+      "team": "McLaren",
+      "grid_position": 2,
+      "status": "Finished",
+      "points": 18.0,
+      "time": 6.812
+    },
+    {
+      "position": 3,
+      "driver": "HUL",
+      "driver_number": 27,
+      "team": "Kick Sauber",
+      "grid_position": 19,
+      "status": "Finished",
+      "points": 15.0,
+      "time": 34.742
+    },
+    {
+      "position": 4,
+      "driver": "HAM",
+      "driver_number": 44,
+      "team": "Ferrari",
+      "grid_position": 5,
+      "status": "Finished",
+      "points": 12.0,
+      "time": 39.812
+    },
+    {
+      "position": 5,
+      "driver": "VER",
+      "driver_number": 1,
+      "team": "Red Bull Racing",
+      "grid_position": 1,
+      "status": "Finished",
+      "points": 10.0,
+      "time": 56.781
+    },
+    {
+      "position": 6,
+      "driver": "GAS",
+      "driver_number": 10,
+      "team": "Alpine",
+      "grid_position": 8,
+      "status": "Finished",
+      "points": 8.0,
+      "time": 59.857
+    },
+    {
+      "position": 7,
+      "driver": "STR",
+      "driver_number": 18,
+      "team": "Aston Martin",
+      "grid_position": 17,
+      "status": "Finished",
+      "points": 6.0,
+      "time": 60.603
+    },
+    {
+      "position": 8,
+      "driver": "ALB",
+      "driver_number": 23,
+      "team": "Williams",
+      "grid_position": 13,
+      "status": "Finished",
+      "points": 4.0,
+      "time": 64.135
+    },
+    {
+      "position": 9,
+      "driver": "ALO",
+      "driver_number": 14,
+      "team": "Aston Martin",
+      "grid_position": 7,
+      "status": "Finished",
+      "points": 2.0,
+      "time": 65.858
+    },
+    {
+      "position": 10,
+      "driver": "RUS",
+      "driver_number": 63,
+      "team": "Mercedes",
+      "grid_position": 4,
+      "status": "Finished",
+      "points": 1.0,
+      "time": 70.674
+    },
+    {
+      "position": 11,
+      "driver": "BEA",
+      "driver_number": 87,
+      "team": "Haas F1 Team",
+      "grid_position": 18,
+      "status": "Finished",
+      "points": 0.0,
+      "time": 72.095
+    },
+    {
+      "position": 12,
+      "driver": "SAI",
+      "driver_number": 55,
+      "team": "Williams",
+      "grid_position": 9,
+      "status": "Finished",
+      "points": 0.0,
+      "time": 76.592
+    },
+    {
+      "position": 13,
+      "driver": "OCO",
+      "driver_number": 31,
+      "team": "Haas F1 Team",
+      "grid_position": 14,
+      "status": "Finished",
+      "points": 0.0,
+      "time": 77.301
+    },
+    {
+      "position": 14,
+      "driver": "LEC",
+      "driver_number": 16,
+      "team": "Ferrari",
+      "grid_position": 6,
+      "status": "Finished",
+      "points": 0.0,
+      "time": 84.477
+    },
+    {
+      "position": 15,
+      "driver": "TSU",
+      "driver_number": 22,
+      "team": "Red Bull Racing",
+      "grid_position": 11,
+      "status": "Lapped",
+      "points": 0.0,
+      "time": 32.25
+    },
+    {
+      "position": 16,
+      "driver": "ANT",
+      "driver_number": 12,
+      "team": "Mercedes",
+      "grid_position": 10,
+      "status": "Retired",
+      "points": 0.0
+    },
+    {
+      "position": 17,
+      "driver": "HAD",
+      "driver_number": 6,
+      "team": "Racing Bulls",
+      "grid_position": 12,
+      "status": "Retired",
+      "points": 0.0
+    },
+    {
+      "position": 18,
+      "driver": "BOR",
+      "driver_number": 5,
+      "team": "Kick Sauber",
+      "grid_position": 16,
+      "status": "Retired",
+      "points": 0.0
+    },
+    {
+      "position": 19,
+      "driver": "LAW",
+      "driver_number": 30,
+      "team": "Racing Bulls",
+      "grid_position": 15,
+      "status": "Retired",
+      "points": 0.0
+    },
+    {
+      "position": 20,
+      "driver": "COL",
+      "driver_number": 43,
+      "team": "Alpine",
+      "grid_position": 20,
+      "status": "Did not start",
+      "points": 0.0
+    }
+  ],
+  "weather": {
+    "air_temp": 17.91741935483871,
+    "track_temp": 23.578709677419354,
+    "humidity": 78.3741935483871,
+    "rainfall": true,
+    "wind_speed": 1.4832258064516128
+  },
+  "fetched_at": "2026-05-21T23:19:40.582362"
+}

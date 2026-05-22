@@ -1,0 +1,227 @@
+{
+  "session_type": "R",
+  "session_name": "Race",
+  "year": 2022,
+  "round": 11,
+  "gp_name": "Austrian Grand Prix",
+  "date": "2022-07-10",
+  "track": "Spielberg",
+  "country": "Austria",
+  "best_times": {
+    "VER": 67.275,
+    "GAS": 70.104,
+    "PER": 71.843,
+    "ALO": 68.558,
+    "LEC": 67.583,
+    "STR": 70.004,
+    "MAG": 69.938,
+    "TSU": 70.023,
+    "ALB": 69.669,
+    "ZHO": 69.38,
+    "RIC": 69.924,
+    "OCO": 69.559,
+    "NOR": 69.304,
+    "HAM": 69.0,
+    "MSC": 69.625,
+    "VET": 70.0,
+    "SAI": 68.649,
+    "LAT": 70.89,
+    "RUS": 69.075,
+    "BOT": 69.266
+  },
+  "results": [
+    {
+      "position": 1,
+      "driver": "LEC",
+      "driver_number": 16,
+      "team": "Ferrari",
+      "grid_position": 2,
+      "status": "Finished",
+      "points": 25.0,
+      "time": 5064.312
+    },
+    {
+      "position": 2,
+      "driver": "VER",
+      "driver_number": 1,
+      "team": "Red Bull Racing",
+      "grid_position": 1,
+      "status": "Finished",
+      "points": 19.0,
+      "time": 1.532
+    },
+    {
+      "position": 3,
+      "driver": "HAM",
+      "driver_number": 44,
+      "team": "Mercedes",
+      "grid_position": 8,
+      "status": "Finished",
+      "points": 15.0,
+      "time": 41.217
+    },
+    {
+      "position": 4,
+      "driver": "RUS",
+      "driver_number": 63,
+      "team": "Mercedes",
+      "grid_position": 4,
+      "status": "Finished",
+      "points": 12.0,
+      "time": 58.972
+    },
+    {
+      "position": 5,
+      "driver": "OCO",
+      "driver_number": 31,
+      "team": "Alpine",
+      "grid_position": 6,
+      "status": "Finished",
+      "points": 10.0,
+      "time": 68.436
+    },
+    {
+      "position": 6,
+      "driver": "MSC",
+      "driver_number": 47,
+      "team": "Haas F1 Team",
+      "grid_position": 9,
+      "status": "+1 Lap",
+      "points": 8.0
+    },
+    {
+      "position": 7,
+      "driver": "NOR",
+      "driver_number": 4,
+      "team": "McLaren",
+      "grid_position": 10,
+      "status": "+1 Lap",
+      "points": 6.0
+    },
+    {
+      "position": 8,
+      "driver": "MAG",
+      "driver_number": 20,
+      "team": "Haas F1 Team",
+      "grid_position": 7,
+      "status": "+1 Lap",
+      "points": 4.0
+    },
+    {
+      "position": 9,
+      "driver": "RIC",
+      "driver_number": 3,
+      "team": "McLaren",
+      "grid_position": 11,
+      "status": "+1 Lap",
+      "points": 2.0
+    },
+    {
+      "position": 10,
+      "driver": "ALO",
+      "driver_number": 14,
+      "team": "Alpine",
+      "grid_position": 19,
+      "status": "+1 Lap",
+      "points": 1.0
+    },
+    {
+      "position": 11,
+      "driver": "BOT",
+      "driver_number": 77,
+      "team": "Alfa Romeo",
+      "grid_position": 0,
+      "status": "+1 Lap",
+      "points": 0.0
+    },
+    {
+      "position": 12,
+      "driver": "ALB",
+      "driver_number": 23,
+      "team": "Williams",
+      "grid_position": 15,
+      "status": "+1 Lap",
+      "points": 0.0
+    },
+    {
+      "position": 13,
+      "driver": "STR",
+      "driver_number": 18,
+      "team": "Aston Martin",
+      "grid_position": 12,
+      "status": "+1 Lap",
+      "points": 0.0
+    },
+    {
+      "position": 14,
+      "driver": "ZHO",
+      "driver_number": 24,
+      "team": "Alfa Romeo",
+      "grid_position": 13,
+      "status": "+1 Lap",
+      "points": 0.0
+    },
+    {
+      "position": 15,
+      "driver": "GAS",
+      "driver_number": 10,
+      "team": "AlphaTauri",
+      "grid_position": 14,
+      "status": "+1 Lap",
+      "points": 0.0
+    },
+    {
+      "position": 16,
+      "driver": "TSU",
+      "driver_number": 22,
+      "team": "AlphaTauri",
+      "grid_position": 16,
+      "status": "+1 Lap",
+      "points": 0.0
+    },
+    {
+      "position": 17,
+      "driver": "VET",
+      "driver_number": 5,
+      "team": "Aston Martin",
+      "grid_position": 18,
+      "status": "+1 Lap",
+      "points": 0.0
+    },
+    {
+      "position": 18,
+      "driver": "SAI",
+      "driver_number": 55,
+      "team": "Ferrari",
+      "grid_position": 3,
+      "status": "Power Unit",
+      "points": 0.0
+    },
+    {
+      "position": 19,
+      "driver": "LAT",
+      "driver_number": 6,
+      "team": "Williams",
+      "grid_position": 17,
+      "status": "Undertray",
+      "points": 0.0
+    },
+    {
+      "position": 20,
+      "driver": "PER",
+      "driver_number": 11,
+      "team": "Red Bull Racing",
+      "grid_position": 5,
+      "status": "Collision damage",
+      "points": 0.0
+    }
+  ],
+  "weather": {
+    "air_temp": 20.25592105263158,
+    "track_temp": 30.74671052631579,
+    "humidity": 35.13815789473684,
+    "rainfall": false,
+    "wind_speed": 1.2552631578947369
+  },
+  "fetched_at": "2026-05-21T17:29:07.935835"
+}

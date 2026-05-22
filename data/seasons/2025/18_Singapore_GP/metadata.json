@@ -1,0 +1,24 @@
+{
+  "sessions": {
+    "FP1": {
+      "status": "complete",
+      "fetched_at": "2026-05-21T23:27:16.921307"
+    },
+    "FP2": {
+      "status": "complete",
+      "fetched_at": "2026-05-21T23:27:22.789801"
+    },
+    "FP3": {
+      "status": "complete",
+      "fetched_at": "2026-05-21T23:27:28.157811"
+    },
+    "Q": {
+      "status": "complete",
+      "fetched_at": "2026-05-21T23:27:54.877066"
+    },
+    "R": {
+      "status": "complete",
+      "fetched_at": "2026-05-21T23:28:02.773240"
+    }
+  }
+}

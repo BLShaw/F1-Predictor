@@ -7,6 +7,10 @@ Provides probability-based race predictions using:
 
 import pandas as pd
 import numpy as np
+import shap
+import joblib
+from pathlib import Path
+from src.data_fetcher import DATA_DIR
 from typing import Dict, List, Optional, Tuple, Any
 import warnings
 warnings.filterwarnings('ignore')
@@ -162,6 +166,7 @@ class F1MLPredictor:
     
     def __init__(self):
         self.model = None
+        self.is_historical = False
         self.feature_names = [
             "grid_norm",
             "pace_norm", 
@@ -186,6 +191,21 @@ class F1MLPredictor:
         # SHAP storage
         self.shap_values = None
         self.shap_explainer = None
+        
+        # Load historical model if available
+        self._load_historical_model()
+        
+    def _load_historical_model(self):
+        """Load the pre-trained historical model from disk if it exists."""
+        model_path = Path(DATA_DIR).parent / "models" / "f1_historical_model.joblib"
+        if model_path.exists():
+            try:
+                self.model = joblib.load(model_path)
+                self.is_historical = True
+                print(f"✅ Loaded historical ML model from {model_path}")
+            except Exception as e:
+                print(f"⚠️ Failed to load historical model: {e}")
+                self.is_historical = False
         
     def _engineer_features(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, np.ndarray]:
         """Engineer ML features from raw data."""
@@ -300,8 +320,8 @@ class F1MLPredictor:
         n_drivers = len(features)
         features_df, X = self._engineer_features(features)
         
-        # Train internal model for this race
-        if HAS_XGBOOST:
+        # Train internal synthetic model only if historical model isn't loaded
+        if not self.is_historical and HAS_XGBOOST:
             self.train_internal_model(X, n_drivers)
         
         # Get base predictions
@@ -311,8 +331,12 @@ class F1MLPredictor:
             # Weighted average of ML and simple physics-based model
             physics_preds = 1 + features_df["position_strength"].values * (n_drivers - 1)
             
-            # Combine: 30% ML, 70% Physics
-            predicted_positions = 0.3 * raw_ml_preds + 0.7 * physics_preds
+            # If using the trained historical model, give it much higher weight
+            if self.is_historical:
+                predicted_positions = 0.8 * raw_ml_preds + 0.2 * physics_preds
+            else:
+                # Combine: 30% ML, 70% Physics (synthetic data is less reliable)
+                predicted_positions = 0.3 * raw_ml_preds + 0.7 * physics_preds
             
             predicted_positions = np.clip(predicted_positions, 1, n_drivers)
         else:

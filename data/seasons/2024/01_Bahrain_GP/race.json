@@ -1,0 +1,242 @@
+{
+  "session_type": "R",
+  "session_name": "Race",
+  "year": 2024,
+  "round": 1,
+  "gp_name": "Bahrain Grand Prix",
+  "date": "2024-03-02",
+  "track": "Sakhir",
+  "country": "Bahrain",
+  "best_times": {
+    "VER": 92.608,
+    "PER": 94.364,
+    "SAI": 94.507,
+    "LEC": 94.09,
+    "RUS": 95.065,
+    "NOR": 94.476,
+    "HAM": 94.722,
+    "PIA": 94.774,
+    "ALO": 94.199,
+    "STR": 95.632,
+    "ZHO": 95.458,
+    "MAG": 95.57,
+    "RIC": 95.163,
+    "TSU": 95.833,
+    "ALB": 95.723,
+    "HUL": 94.834,
+    "OCO": 96.226,
+    "GAS": 94.805,
+    "BOT": 96.202,
+    "SAR": 94.735
+  },
+  "results": [
+    {
+      "position": 1,
+      "driver": "VER",
+      "driver_number": 1,
+      "team": "Red Bull Racing",
+      "grid_position": 1,
+      "status": "Finished",
+      "points": 26.0,
+      "time": 5504.742
+    },
+    {
+      "position": 2,
+      "driver": "PER",
+      "driver_number": 11,
+      "team": "Red Bull Racing",
+      "grid_position": 5,
+      "status": "Finished",
+      "points": 18.0,
+      "time": 22.457
+    },
+    {
+      "position": 3,
+      "driver": "SAI",
+      "driver_number": 55,
+      "team": "Ferrari",
+      "grid_position": 4,
+      "status": "Finished",
+      "points": 15.0,
+      "time": 25.11
+    },
+    {
+      "position": 4,
+      "driver": "LEC",
+      "driver_number": 16,
+      "team": "Ferrari",
+      "grid_position": 2,
+      "status": "Finished",
+      "points": 12.0,
+      "time": 39.669
+    },
+    {
+      "position": 5,
+      "driver": "RUS",
+      "driver_number": 63,
+      "team": "Mercedes",
+      "grid_position": 3,
+      "status": "Finished",
+      "points": 10.0,
+      "time": 46.788
+    },
+    {
+      "position": 6,
+      "driver": "NOR",
+      "driver_number": 4,
+      "team": "McLaren",
+      "grid_position": 7,
+      "status": "Finished",
+      "points": 8.0,
+      "time": 48.458
+    },
+    {
+      "position": 7,
+      "driver": "HAM",
+      "driver_number": 44,
+      "team": "Mercedes",
+      "grid_position": 9,
+      "status": "Finished",
+      "points": 6.0,
+      "time": 50.324
+    },
+    {
+      "position": 8,
+      "driver": "PIA",
+      "driver_number": 81,
+      "team": "McLaren",
+      "grid_position": 8,
+      "status": "Finished",
+      "points": 4.0,
+      "time": 56.082
+    },
+    {
+      "position": 9,
+      "driver": "ALO",
+      "driver_number": 14,
+      "team": "Aston Martin",
+      "grid_position": 6,
+      "status": "Finished",
+      "points": 2.0,
+      "time": 74.887
+    },
+    {
+      "position": 10,
+      "driver": "STR",
+      "driver_number": 18,
+      "team": "Aston Martin",
+      "grid_position": 12,
+      "status": "Finished",
+      "points": 1.0,
+      "time": 93.216
+    },
+    {
+      "position": 11,
+      "driver": "ZHO",
+      "driver_number": 24,
+      "team": "Kick Sauber",
+      "grid_position": 17,
+      "status": "Lapped",
+      "points": 0.0,
+      "time": 6.759
+    },
+    {
+      "position": 12,
+      "driver": "MAG",
+      "driver_number": 20,
+      "team": "Haas F1 Team",
+      "grid_position": 15,
+      "status": "Lapped",
+      "points": 0.0,
+      "time": 8.316
+    },
+    {
+      "position": 13,
+      "driver": "RIC",
+      "driver_number": 3,
+      "team": "RB",
+      "grid_position": 14,
+      "status": "Lapped",
+      "points": 0.0,
+      "time": 8.958
+    },
+    {
+      "position": 14,
+      "driver": "TSU",
+      "driver_number": 22,
+      "team": "RB",
+      "grid_position": 11,
+      "status": "Lapped",
+      "points": 0.0,
+      "time": 9.482
+    },
+    {
+      "position": 15,
+      "driver": "ALB",
+      "driver_number": 23,
+      "team": "Williams",
+      "grid_position": 13,
+      "status": "Lapped",
+      "points": 0.0,
+      "time": 11.886
+    },
+    {
+      "position": 16,
+      "driver": "HUL",
+      "driver_number": 27,
+      "team": "Haas F1 Team",
+      "grid_position": 10,
+      "status": "Lapped",
+      "points": 0.0,
+      "time": 17.632
+    },
+    {
+      "position": 17,
+      "driver": "OCO",
+      "driver_number": 31,
+      "team": "Alpine",
+      "grid_position": 19,
+      "status": "Lapped",
+      "points": 0.0,
+      "time": 31.45
+    },
+    {
+      "position": 18,
+      "driver": "GAS",
+      "driver_number": 10,
+      "team": "Alpine",
+      "grid_position": 20,
+      "status": "Lapped",
+      "points": 0.0,
+      "time": 32.417
+    },
+    {
+      "position": 19,
+      "driver": "BOT",
+      "driver_number": 77,
+      "team": "Kick Sauber",
+      "grid_position": 16,
+      "status": "Lapped",
+      "points": 0.0,
+      "time": 83.23
+    },
+    {
+      "position": 20,
+      "driver": "SAR",
+      "driver_number": 2,
+      "team": "Williams",
+      "grid_position": 18,
+      "status": "Lapped",
+      "points": 0.0,
+      "time": 20.795
+    }
+  ],
+  "weather": {
+    "air_temp": 18.22738853503185,
+    "track_temp": 23.652866242038222,
+    "humidity": 48.82165605095541,
+    "rainfall": false,
+    "wind_speed": 0.7859872611464969
+  },
+  "fetched_at": "2026-05-21T22:35:47.473419"
+}

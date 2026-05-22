@@ -1,0 +1,234 @@
+{
+  "session_type": "R",
+  "session_name": "Race",
+  "year": 2022,
+  "round": 16,
+  "gp_name": "Italian Grand Prix",
+  "date": "2022-09-11",
+  "track": "Monza",
+  "country": "Italy",
+  "best_times": {
+    "VER": 84.745,
+    "GAS": 86.718,
+    "PER": 84.03,
+    "ALO": 87.203,
+    "LEC": 84.336,
+    "STR": 87.467,
+    "MAG": 86.798,
+    "TSU": 86.857,
+    "ZHO": 86.361,
+    "RIC": 86.603,
+    "OCO": 86.593,
+    "NOR": 84.718,
+    "HAM": 84.434,
+    "DEV": 86.624,
+    "MSC": 85.298,
+    "VET": 87.501,
+    "SAI": 84.42,
+    "LAT": 86.798,
+    "RUS": 85.288,
+    "BOT": 85.706
+  },
+  "results": [
+    {
+      "position": 1,
+      "driver": "VER",
+      "driver_number": 1,
+      "team": "Red Bull Racing",
+      "grid_position": 7,
+      "status": "Finished",
+      "points": 25.0,
+      "time": 4827.511
+    },
+    {
+      "position": 2,
+      "driver": "LEC",
+      "driver_number": 16,
+      "team": "Ferrari",
+      "grid_position": 1,
+      "status": "Finished",
+      "points": 18.0,
+      "time": 2.446
+    },
+    {
+      "position": 3,
+      "driver": "RUS",
+      "driver_number": 63,
+      "team": "Mercedes",
+      "grid_position": 2,
+      "status": "Finished",
+      "points": 15.0,
+      "time": 3.4050000000000002
+    },
+    {
+      "position": 4,
+      "driver": "SAI",
+      "driver_number": 55,
+      "team": "Ferrari",
+      "grid_position": 18,
+      "status": "Finished",
+      "points": 12.0,
+      "time": 5.061
+    },
+    {
+      "position": 5,
+      "driver": "HAM",
+      "driver_number": 44,
+      "team": "Mercedes",
+      "grid_position": 19,
+      "status": "Finished",
+      "points": 10.0,
+      "time": 5.38
+    },
+    {
+      "position": 6,
+      "driver": "PER",
+      "driver_number": 11,
+      "team": "Red Bull Racing",
+      "grid_position": 13,
+      "status": "Finished",
+      "points": 9.0,
+      "time": 6.091
+    },
+    {
+      "position": 7,
+      "driver": "NOR",
+      "driver_number": 4,
+      "team": "McLaren",
+      "grid_position": 3,
+      "status": "Finished",
+      "points": 6.0,
+      "time": 6.207
+    },
+    {
+      "position": 8,
+      "driver": "GAS",
+      "driver_number": 10,
+      "team": "AlphaTauri",
+      "grid_position": 5,
+      "status": "Finished",
+      "points": 4.0,
+      "time": 6.396
+    },
+    {
+      "position": 9,
+      "driver": "DEV",
+      "driver_number": 45,
+      "team": "Williams",
+      "grid_position": 8,
+      "status": "Finished",
+      "points": 2.0,
+      "time": 7.122
+    },
+    {
+      "position": 10,
+      "driver": "ZHO",
+      "driver_number": 24,
+      "team": "Alfa Romeo",
+      "grid_position": 9,
+      "status": "Finished",
+      "points": 1.0,
+      "time": 7.91
+    },
+    {
+      "position": 11,
+      "driver": "OCO",
+      "driver_number": 31,
+      "team": "Alpine",
+      "grid_position": 14,
+      "status": "Finished",
+      "points": 0.0,
+      "time": 8.323
+    },
+    {
+      "position": 12,
+      "driver": "MSC",
+      "driver_number": 47,
+      "team": "Haas F1 Team",
+      "grid_position": 17,
+      "status": "Finished",
+      "points": 0.0,
+      "time": 8.549
+    },
+    {
+      "position": 13,
+      "driver": "BOT",
+      "driver_number": 77,
+      "team": "Alfa Romeo",
+      "grid_position": 15,
+      "status": "+1 Lap",
+      "points": 0.0
+    },
+    {
+      "position": 14,
+      "driver": "TSU",
+      "driver_number": 22,
+      "team": "AlphaTauri",
+      "grid_position": 20,
+      "status": "+1 Lap",
+      "points": 0.0
+    },
+    {
+      "position": 15,
+      "driver": "LAT",
+      "driver_number": 6,
+      "team": "Williams",
+      "grid_position": 10,
+      "status": "+1 Lap",
+      "points": 0.0
+    },
+    {
+      "position": 16,
+      "driver": "MAG",
+      "driver_number": 20,
+      "team": "Haas F1 Team",
+      "grid_position": 16,
+      "status": "+1 Lap",
+      "points": 0.0
+    },
+    {
+      "position": 17,
+      "driver": "RIC",
+      "driver_number": 3,
+      "team": "McLaren",
+      "grid_position": 4,
+      "status": "Oil leak",
+      "points": 0.0
+    },
+    {
+      "position": 18,
+      "driver": "STR",
+      "driver_number": 18,
+      "team": "Aston Martin",
+      "grid_position": 12,
+      "status": "Engine",
+      "points": 0.0
+    },
+    {
+      "position": 19,
+      "driver": "ALO",
+      "driver_number": 14,
+      "team": "Alpine",
+      "grid_position": 6,
+      "status": "Water pressure",
+      "points": 0.0
+    },
+    {
+      "position": 20,
+      "driver": "VET",
+      "driver_number": 5,
+      "team": "Aston Martin",
+      "grid_position": 11,
+      "status": "Engine",
+      "points": 0.0
+    }
+  ],
+  "weather": {
+    "air_temp": 27.73469387755102,
+    "track_temp": 43.138775510204084,
+    "humidity": 33.14965986394558,
+    "rainfall": false,
+    "wind_speed": 1.3612244897959185
+  },
+  "fetched_at": "2026-05-21T18:34:20.839512"
+}

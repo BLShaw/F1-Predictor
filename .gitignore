@@ -40,7 +40,12 @@ Icon?
 
 # directory
 f1_cache/
-data/seasons
+/docs
 
 # Tests
 tests/
+
+# Environment Variables & Secrets
+.env
+.streamlit/secrets.toml
+*.sqlite
