@@ -5,6 +5,7 @@ organized by season and Grand Prix.
 
 import json
 import logging
+import streamlit as st
 from pathlib import Path
 from typing import Optional, Dict, List, Any, Tuple
 import pandas as pd
@@ -17,6 +18,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 SEASONS_DIR = DATA_DIR / "seasons"
 
 
+@st.cache_data
 def get_available_seasons() -> List[int]:
     """Get list of seasons with data available."""
     if not SEASONS_DIR.exists():
@@ -30,6 +32,7 @@ def get_available_seasons() -> List[int]:
     return sorted(seasons, reverse=True)
 
 
+@st.cache_data
 def get_season_schedule(year: int) -> List[Dict]:
     """Load season schedule from JSON."""
     schedule_path = SEASONS_DIR / str(year) / "schedule.json"
@@ -41,6 +44,7 @@ def get_season_schedule(year: int) -> List[Dict]:
     return []
 
 
+@st.cache_data
 def get_available_gps(year: int) -> List[Dict]:
     """
     Get list of GPs with data for a season.
@@ -119,6 +123,7 @@ def load_session(year: int, gp_folder: str, session_type: str) -> Optional[Dict]
     return None
 
 
+@st.cache_data
 def load_gp_data(year: int, gp_folder: str) -> Dict[str, Any]:
     """
     Load all available session data for a GP.
@@ -247,6 +252,7 @@ def get_historical_gp_data(gp_name: str, years: List[int] = None) -> List[Dict]:
     return historical_data
 
 
+@st.cache_data
 def load_static_data() -> Dict[str, Any]:
     """Load static data files (only tracks.json remains)."""
     static_data = {}

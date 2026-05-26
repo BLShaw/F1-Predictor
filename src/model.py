@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 import shap
 import joblib
+import streamlit as st
 from pathlib import Path
 from src.data_fetcher import DATA_DIR
 from typing import Dict, List, Optional, Tuple, Any
@@ -30,6 +31,17 @@ except ImportError:
 
 # For backwards compatibility
 HAS_XGBOOST = HAS_SKLEARN_GB
+
+
+@st.cache_resource
+def load_saved_ml_model(model_path: Path):
+    """Loads the joblib binary exactly once and keeps it in memory."""
+    if model_path.exists():
+        try:
+            return joblib.load(model_path)
+        except Exception as e:
+            print(f"[WARNING] Failed to load cached model: {e}")
+    return None
 
 
 class AdvancedRacePredictor:
@@ -60,9 +72,11 @@ class AdvancedRacePredictor:
     def calculate_base_score(self, df: pd.DataFrame) -> pd.DataFrame:
         """Calculate base performance score from pace and grid."""
         df = df.copy()
-        
-        # Normalize inputs (Rank-based normalization)
+        n_drivers = len(df)
+        df["grid"] = pd.to_numeric(df["grid"], errors="coerce").fillna(n_drivers)
         if "best" in df.columns:
+            df["best"] = pd.to_numeric(df["best"], errors="coerce")
+            df["best"] = df["best"].fillna(df["best"].max() if df["best"].notna().any() else 90.0)
             df["pace_score"] = df["best"].rank(ascending=True)
         else:
             # Fallback if no pace data
@@ -75,7 +89,8 @@ class AdvancedRacePredictor:
         )
         return df
 
-    def predict(self, features: pd.DataFrame, n_sims: int = 1000) -> pd.DataFrame:
+    @st.cache_data
+    def predict(_self, features: pd.DataFrame, n_sims: int = 1000) -> pd.DataFrame:
         """
         Run Monte Carlo simulation to predict race results.
         
@@ -86,6 +101,7 @@ class AdvancedRacePredictor:
         Returns:
             DataFrame with prediction stats
         """
+        self = _self
         # Prepare data
         sim_df = self.calculate_base_score(features)
         drivers = sim_df["driver"].values
@@ -130,7 +146,7 @@ class AdvancedRacePredictor:
             
             stats.append({
                 "Driver": driver,
-                "Grid": features.iloc[i]["grid"],
+                "Grid": int(sim_df.iloc[i]["grid"]),
                 "Win %": win_prob,
                 "Podium %": podium_prob,
                 "Points %": q_prob,
@@ -198,32 +214,37 @@ class F1MLPredictor:
     def _load_historical_model(self):
         """Load the pre-trained historical model from disk if it exists."""
         model_path = Path(DATA_DIR).parent / "models" / "f1_historical_model.joblib"
-        if model_path.exists():
-            try:
-                self.model = joblib.load(model_path)
-                self.is_historical = True
-                print(f"[SUCCESS] Loaded historical ML model from {model_path}")
-            except Exception as e:
-                print(f"[WARNING] Failed to load historical model: {e}")
-                self.is_historical = False
+        cached_model = load_saved_ml_model(model_path)
+        if cached_model is not None:
+            self.model = cached_model
+            self.is_historical = True
+            print(f"[SUCCESS] Loaded historical ML model from {model_path} via cache")
+        else:
+            self.is_historical = False
         
     def _engineer_features(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, np.ndarray]:
         """Engineer ML features from raw data."""
         features_df = df.copy()
         n_drivers = len(features_df)
         
+        # Handle NaN values safely in grid and practice times
+        features_df["grid"] = pd.to_numeric(features_df["grid"], errors="coerce").fillna(n_drivers)
         features_df["grid_norm"] = (features_df["grid"] - 1) / max(n_drivers - 1, 1)
-        
         if "best" in features_df.columns:
+            features_df["best"] = pd.to_numeric(features_df["best"], errors="coerce")
+            features_df["best"] = features_df["best"].fillna(features_df["best"].max() if features_df["best"].notna().any() else 90.0)
+            
             pace_min = features_df["best"].min()
             pace_max = features_df["best"].max()
             pace_range = pace_max - pace_min if pace_max > pace_min else 1
             features_df["pace_norm"] = (features_df["best"] - pace_min) / pace_range
         else:
-            features_df["pace_norm"] = features_df["grid_norm"]
+            features_df["pace_norm"] = (features_df["grid"] - 1) / max(n_drivers - 1, 1)
         
         # 3. Pace consistency
         if "avg" in features_df.columns and "best" in features_df.columns:
+            features_df["avg"] = pd.to_numeric(features_df["avg"], errors="coerce")
+            features_df["avg"] = features_df["avg"].fillna(features_df["avg"].max() if features_df["avg"].notna().any() else 90.0)
             features_df["pace_consistency"] = (features_df["avg"] - features_df["best"]).clip(0, 5) / 5
         else:
             features_df["pace_consistency"] = 0.2
@@ -306,7 +327,8 @@ class F1MLPredictor:
         
         return True
     
-    def predict(self, features: pd.DataFrame, n_sims: int = 1000) -> Dict[str, Any]:
+    @st.cache_data
+    def predict(_self, features: pd.DataFrame, n_sims: int = 1000) -> Dict[str, Any]:
         """
         Run ML prediction with SHAP explanations.
         
@@ -317,6 +339,7 @@ class F1MLPredictor:
         Returns:
             Dictionary with predictions, SHAP values, and feature importance
         """
+        self = _self
         n_drivers = len(features)
         features_df, X = self._engineer_features(features)
         
@@ -409,7 +432,7 @@ class F1MLPredictor:
             
             stats.append({
                 "Driver": driver,
-                "Grid": int(features.iloc[i]["grid"]),
+                "Grid": int(features_df.iloc[i]["grid"]),
                 "Predicted Pos": round(predicted_positions[i], 1),
                 "Win %": win_prob,
                 "Podium %": podium_prob,
