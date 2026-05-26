@@ -202,9 +202,9 @@ class F1MLPredictor:
             try:
                 self.model = joblib.load(model_path)
                 self.is_historical = True
-                print(f"✅ Loaded historical ML model from {model_path}")
+                print(f"[SUCCESS] Loaded historical ML model from {model_path}")
             except Exception as e:
-                print(f"⚠️ Failed to load historical model: {e}")
+                print(f"[WARNING] Failed to load historical model: {e}")
                 self.is_historical = False
         
     def _engineer_features(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, np.ndarray]:

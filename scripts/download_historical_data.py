@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import logging
+import datetime
 import fastf1
 
 # Ensure we can import from the src directory
@@ -88,7 +89,8 @@ def main():
     logger.info("Target: 2022 Season -> Present (Latest Race)")
     sessions_to_fetch = ["FP1", "FP2", "FP3", "Q", "SQ", "SS", "S", "R"]
     
-    for year in range(2022, 2027):
+    current_year = datetime.datetime.now().year
+    for year in range(2022, current_year + 1):
         logger.info(f"Fetching schedule for {year} season...")
         schedule = fastf1.get_event_schedule(year)
         
@@ -101,9 +103,8 @@ def main():
             gp_name = event['EventName']
             
             # Stop condition: Only download past events
-            import datetime
             if event['EventDate'] > datetime.datetime.now():
-                logger.info(f"✅ Reached future event: {year} {gp_name}. Historical data download complete up to today!")
+                logger.info(f"[COMPLETE] Reached future event: {year} {gp_name}. Historical data download complete up to today!")
                 return
                 
             # Determine which sessions are actually scheduled
@@ -124,7 +125,7 @@ def main():
                     sessions_to_fetch.append(session)
                     
             if not sessions_to_fetch:
-                logger.info(f"⏭Skipping {year} Round {round_num}: {gp_name} (all {len(scheduled_sessions)} sessions already downloaded)")
+                logger.info(f"[SKIP] Skipping {year} Round {round_num}: {gp_name} (all {len(scheduled_sessions)} sessions already downloaded)")
                 continue
                 
             logger.info(f"Downloading {year} Round {round_num}: {gp_name} (fetching: {', '.join(sessions_to_fetch)})...")

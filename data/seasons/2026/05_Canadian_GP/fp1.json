@@ -1,0 +1,241 @@
+{
+  "session_type": "FP1",
+  "session_name": "Practice 1",
+  "year": 2026,
+  "round": 5,
+  "gp_name": "Canadian Grand Prix",
+  "date": "2026-05-22",
+  "track": "Montr\u00e9al",
+  "country": "Canada",
+  "best_times": {
+    "NOR": 74.799,
+    "GAS": 76.809,
+    "PER": 77.926,
+    "ANT": 73.402,
+    "ALO": 75.863,
+    "LEC": 74.355,
+    "STR": 76.978,
+    "ALB": 76.642,
+    "HUL": 75.698,
+    "VER": 74.366,
+    "LAW": 77.431,
+    "OCO": 76.497,
+    "LIN": 75.452,
+    "HAM": 74.176,
+    "BOR": 76.214,
+    "SAI": 76.66,
+    "HAD": 76.253,
+    "RUS": 73.544,
+    "BOT": 77.868,
+    "PIA": 74.963,
+    "BEA": 77.77
+  },
+  "results": [
+    {
+      "position": null,
+      "driver": "NOR",
+      "driver_number": 1,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "VER",
+      "driver_number": 3,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "BOR",
+      "driver_number": 5,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "HAD",
+      "driver_number": 6,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "GAS",
+      "driver_number": 10,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "PER",
+      "driver_number": 11,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "ANT",
+      "driver_number": 12,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "ALO",
+      "driver_number": 14,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "LEC",
+      "driver_number": 16,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "STR",
+      "driver_number": 18,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "ALB",
+      "driver_number": 23,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "HUL",
+      "driver_number": 27,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "LAW",
+      "driver_number": 30,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "OCO",
+      "driver_number": 31,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "LIN",
+      "driver_number": 41,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "COL",
+      "driver_number": 43,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "HAM",
+      "driver_number": 44,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "SAI",
+      "driver_number": 55,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "RUS",
+      "driver_number": 63,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "BOT",
+      "driver_number": 77,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "PIA",
+      "driver_number": 81,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    },
+    {
+      "position": null,
+      "driver": "BEA",
+      "driver_number": 87,
+      "team": "",
+      "grid_position": null,
+      "status": "",
+      "points": 0
+    }
+  ],
+  "weather": {
+    "air_temp": 16.641176470588242,
+    "track_temp": 39.70980392156863,
+    "humidity": 28.231372549019607,
+    "rainfall": false,
+    "wind_speed": 2.212745098039216
+  },
+  "fetched_at": "2026-05-26T23:57:43.073287"
+}
