@@ -112,7 +112,7 @@ def extract_weather(session) -> Dict:
                 "rainfall": bool(weather["Rainfall"].any()) if "Rainfall" in weather else False,
                 "wind_speed": float(weather["WindSpeed"].mean()) if "WindSpeed" in weather else None,
             }
-    except Exception as e:
+    except (AttributeError, KeyError, TypeError) as e:
         logger.warning(f"Could not extract weather data: {e}")
     return {}
 
@@ -176,7 +176,7 @@ def fetch_session(year: int, gp: str, session_type: str) -> Optional[Dict]:
         logger.info(f"Successfully fetched {session_type} for {gp_name} {year}")
         return session_data, round_num, gp_name
         
-    except Exception as e:
+    except (ValueError, ConnectionError, KeyError, AttributeError) as e:
         logger.error(f"Error fetching {session_type} for {gp} {year}: {e}")
         return None
 
@@ -304,7 +304,7 @@ def fetch_season(year: int, sessions: List[str] = None):
                 
                 fetch_gp(year, event["round"], gp_sessions)
                 
-    except Exception as e:
+    except (ValueError, ConnectionError, KeyError) as e:
         logger.error(f"Error fetching season {year}: {e}")
 
 
@@ -348,7 +348,7 @@ def update_latest_session(year: int = None) -> Optional[str]:
         
         return "No new sessions available"
         
-    except Exception as e:
+    except (ValueError, ConnectionError, KeyError) as e:
         logger.error(f"Error updating latest session: {e}")
         return None
 

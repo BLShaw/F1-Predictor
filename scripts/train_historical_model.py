@@ -6,7 +6,6 @@ import pandas as pd
 import joblib
 from pathlib import Path
 
-# Add parent directory to path to import src modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.data_fetcher import DATA_DIR
@@ -90,9 +89,8 @@ def main():
             race = load_json(gp_dir / "race.json")
             
             if not race:
-                continue # Can't train without targets
+                continue
                 
-            # Prefer standard qualifying, fallback to sprint quali/shootout for grid
             grid_data = quali if quali else (sprint_quali if sprint_quali else sprint_shootout)
             if not grid_data:
                 continue
@@ -124,7 +122,6 @@ def main():
                     "grid": grid_positions[d],
                 }
                 
-                # Add pace data
                 pace_row = pace_df[pace_df["driver"] == d]
                 if not pace_row.empty:
                     row["best"] = pace_row.iloc[0].get("best", None)
@@ -144,11 +141,8 @@ def main():
                 
             gp_df = pd.DataFrame(gp_features)
             
-            # Use F1MLPredictor to engineer the features
-            # _engineer_features expects columns: driver, grid, best, avg
             features_df, X_gp = predictor._engineer_features(gp_df)
             
-            # Add the engineered rows to our training set
             for x_row in X_gp:
                 all_features.append(x_row)
                 

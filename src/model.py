@@ -39,7 +39,7 @@ def load_saved_ml_model(model_path: Path):
     if model_path.exists():
         try:
             return joblib.load(model_path)
-        except Exception as e:
+        except (OSError, ValueError) as e:
             print(f"[WARNING] Failed to load cached model: {e}")
     return None
 
@@ -198,6 +198,19 @@ class F1MLPredictor:
             "position_strength": "Combined Position Strength Score"
         }
         
+        # Model Configuration Constants
+        self.WEIGHT_GRID_NORM = 0.85
+        self.WEIGHT_PACE_NORM = 0.10
+        self.WEIGHT_PACE_CONSISTENCY = 0.05
+        
+        self.ENSEMBLE_WEIGHT_ML_HISTORICAL = 0.8
+        self.ENSEMBLE_WEIGHT_PHYSICS_HISTORICAL = 0.2
+        self.ENSEMBLE_WEIGHT_ML_SYNTHETIC = 0.3
+        self.ENSEMBLE_WEIGHT_PHYSICS_SYNTHETIC = 0.7
+        
+        self.SIM_INCIDENT_PROB = 0.10
+        self.SIM_DNF_PROB = 0.05
+        
         # Points system
         self.points_map = {
             1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 
@@ -255,9 +268,9 @@ class F1MLPredictor:
         
         # 5. Position strength
         features_df["position_strength"] = (
-            0.85 * features_df["grid_norm"] +
-            0.10 * features_df["pace_norm"] +
-            0.05 * features_df["pace_consistency"]
+            self.WEIGHT_GRID_NORM * features_df["grid_norm"] +
+            self.WEIGHT_PACE_NORM * features_df["pace_norm"] +
+            self.WEIGHT_PACE_CONSISTENCY * features_df["pace_consistency"]
         )
         
         X = features_df[self.feature_names].values
@@ -286,9 +299,9 @@ class F1MLPredictor:
             delta = (grid_norm - pace_norm) * 0.3
             
             strength = (
-                0.85 * grid_norm +
-                0.10 * pace_norm +
-                0.05 * consistency
+                self.WEIGHT_GRID_NORM * grid_norm +
+                self.WEIGHT_PACE_NORM * pace_norm +
+                self.WEIGHT_PACE_CONSISTENCY * consistency
             )
             
             # Simulate finishing position
@@ -298,12 +311,12 @@ class F1MLPredictor:
             
             race_noise = np.random.normal(0, 1.2)
             
-            # First lap incidents (10% chance)
-            if np.random.random() < 0.10:
+            # First lap incidents
+            if np.random.random() < self.SIM_INCIDENT_PROB:
                 race_noise += np.random.normal(0, 2.5)
             
-            # DNF simulation (5% chance)
-            if np.random.random() < 0.05:
+            # DNF simulation
+            if np.random.random() < self.SIM_DNF_PROB:
                 final_pos = n_drivers
             else:
                 final_pos = base_pos + pace_adjustment + race_noise
@@ -356,10 +369,10 @@ class F1MLPredictor:
             
             # If using the trained historical model, give it much higher weight
             if self.is_historical:
-                predicted_positions = 0.8 * raw_ml_preds + 0.2 * physics_preds
+                predicted_positions = self.ENSEMBLE_WEIGHT_ML_HISTORICAL * raw_ml_preds + self.ENSEMBLE_WEIGHT_PHYSICS_HISTORICAL * physics_preds
             else:
-                # Combine: 30% ML, 70% Physics (synthetic data is less reliable)
-                predicted_positions = 0.3 * raw_ml_preds + 0.7 * physics_preds
+                # Combine ML and Physics (synthetic data is less reliable)
+                predicted_positions = self.ENSEMBLE_WEIGHT_ML_SYNTHETIC * raw_ml_preds + self.ENSEMBLE_WEIGHT_PHYSICS_SYNTHETIC * physics_preds
             
             predicted_positions = np.clip(predicted_positions, 1, n_drivers)
         else:
@@ -391,7 +404,7 @@ class F1MLPredictor:
                     "feature_names": self.feature_names,
                     "X": X
                 }
-            except Exception as e:
+            except (ValueError, TypeError, AttributeError) as e:
                 shap_error = str(e)
                 print(f"SHAP calculation failed: {e}")
         elif not HAS_SHAP:
@@ -406,7 +419,7 @@ class F1MLPredictor:
             iter_positions = predicted_positions + noise
             
             # DNF simulation
-            dnf_mask = np.random.random(n_drivers) < 0.05
+            dnf_mask = np.random.random(n_drivers) < self.SIM_DNF_PROB
             iter_positions[dnf_mask] = float('inf')
             
             # Convert to ranks
