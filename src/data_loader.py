@@ -18,7 +18,6 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 SEASONS_DIR = DATA_DIR / "seasons"
 
 
-@st.cache_data
 def get_available_seasons() -> List[int]:
     """Get list of seasons with data available."""
     if not SEASONS_DIR.exists():
@@ -44,7 +43,6 @@ def get_season_schedule(year: int) -> List[Dict]:
     return []
 
 
-@st.cache_data
 def get_available_gps(year: int) -> List[Dict]:
     """
     Get list of GPs with data for a season.
