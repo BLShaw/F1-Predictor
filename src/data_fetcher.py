@@ -176,7 +176,7 @@ def fetch_session(year: int, gp: str, session_type: str) -> Optional[Dict]:
         logger.info(f"Successfully fetched {session_type} for {gp_name} {year}")
         return session_data, round_num, gp_name
         
-    except (ValueError, ConnectionError, KeyError, AttributeError) as e:
+    except Exception as e:
         logger.error(f"Error fetching {session_type} for {gp} {year}: {e}")
         return None
 
