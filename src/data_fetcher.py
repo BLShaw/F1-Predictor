@@ -354,3 +354,40 @@ def update_latest_session(year: int | None = None) -> str | None:
     except Exception as exc:
         logger.error("Error updating latest session: %s", exc)
         return None
+
+
+def main(argv: list[str] | None = None) -> None:
+    """CLI entrypoint for targeted telemetry fetching via FastF1."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Fetch F1 telemetry data via FastF1.")
+    parser.add_argument("--year", type=int, default=datetime.now().year, help="Championship season year")
+    parser.add_argument("--gp", type=str, default=None, help="Grand Prix name or substring (e.g. Monaco, Bahrain)")
+    parser.add_argument("--round", type=int, default=None, help="Round number")
+    parser.add_argument("--sessions", nargs="+", default=None, help="Session codes (e.g. FP1 FP2 Q R)")
+
+    args = parser.parse_args(argv)
+
+    if args.round is not None:
+        fetch_gp(args.year, args.round, args.sessions)
+    elif args.gp is not None:
+        schedule = fastf1.get_event_schedule(args.year)
+        matched_round = None
+        for _, event in schedule.iterrows():
+            event_name = str(event.get("EventName", "")).lower()
+            if args.gp.lower() in event_name:
+                matched_round = int(event["RoundNumber"])
+                logger.info("Matched %s to %s (Round %d)", args.gp, event["EventName"], matched_round)
+                break
+        if matched_round is not None:
+            fetch_gp(args.year, matched_round, args.sessions)
+        else:
+            logger.error("No Grand Prix matching '%s' found for season %d", args.gp, args.year)
+    else:
+        fetch_season(args.year, args.sessions)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    main()
+

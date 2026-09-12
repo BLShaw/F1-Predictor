@@ -1,5 +1,6 @@
 """Automated F1 Historical Data Downloader with rate-limit resiliency."""
 
+import argparse
 import json
 import logging
 import sys
@@ -100,15 +101,27 @@ def is_valid_session_file(file_path: Path) -> bool:
         return False
 
 
-def main() -> int:
-    """Execute historical data download from 2022 to current season."""
-    logger.info("Starting F1 Historical Data Downloader")
-    logger.info("Target: 2022 Season -> Present (Completed Races)")
+def main(argv: list[str] | None = None) -> int:
+    """Execute historical data download from specified seasons or 2022 to current."""
+    parser = argparse.ArgumentParser(description="Automated F1 Historical Data Downloader with rate-limit resiliency.")
+    parser.add_argument(
+        "--years",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Specific seasons to download (e.g. --years 2025 2026). Default: 2022 to current.",
+    )
+    args = parser.parse_args(argv)
 
     current_year = datetime.now().year
+    target_years = sorted(args.years) if args.years else list(range(2022, current_year + 1))
+
+    logger.info("Starting F1 Historical Data Downloader")
+    logger.info("Target Seasons: %s", target_years)
+
     new_downloads_count = 0
 
-    for year in range(2022, current_year + 1):
+    for year in target_years:
         logger.info("Fetching calendar schedule for %d season...", year)
         schedule = fastf1.get_event_schedule(year)
 
@@ -123,12 +136,13 @@ def main() -> int:
 
             if naive_event_date > datetime.now():
                 logger.info(
-                    "Reached future event: %d Round %d: %s. Completed historical sync up to today.",
+                    "Reached future event: %d Round %d: %s. Completed historical sync for %d.",
                     year,
                     round_num,
                     gp_name,
+                    year,
                 )
-                return new_downloads_count
+                break
 
             scheduled_sessions = get_scheduled_sessions(event)
             if not scheduled_sessions:
@@ -160,7 +174,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     try:
-        main()
+        sys.exit(0 if main() >= 0 else 1)
     except KeyboardInterrupt:
         logger.info("Download interrupted by user.")
         sys.exit(0)

@@ -43,7 +43,7 @@ def main() -> None:
         render_empty_state(
             title="AWAITING TELEMETRY SELECTION",
             message="Select a championship season and Grand Prix event from Mission Control in the sidebar to begin analysis.",
-            hint="To fetch telemetry from terminal: python -m src.data_fetcher --year 2024 --gp Monaco",
+            hint="To fetch telemetry from terminal: python scripts/download_historical_data.py --years 2025 2026",
         )
         return
 
@@ -62,7 +62,7 @@ def main() -> None:
     )
 
     if is_sprint_weekend:
-        tab_names = ["Overview", "Practice", "Sprint Shootout", "Sprint", "Race", "Predict"]
+        tab_names = ["Overview", "Practice", "Sprint Shootout", "Sprint Race", "Race", "Predict"]
     else:
         tab_names = ["Overview", "Practice", "Qualifying", "Race", "Predict"]
 

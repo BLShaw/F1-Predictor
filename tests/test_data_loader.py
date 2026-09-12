@@ -7,7 +7,9 @@ import pandas as pd
 from src.data_loader import (
     aggregate_practice_pace,
     build_weekend_features,
+    get_drivers_from_session,
     get_qualifying_results,
+    get_race_results,
     resolve_starting_grid,
 )
 
@@ -210,3 +212,35 @@ def test_get_qualifying_results_columns_are_strictly_unique() -> None:
     df = get_qualifying_results(session)
     assert df.columns.is_unique
     assert len(df.columns) == len(set(df.columns))
+
+
+def test_get_race_results_malformed_or_corrupt() -> None:
+    """Verify get_race_results gracefully handles None, non-dict, and non-list results."""
+    assert get_race_results(None).empty
+    assert get_race_results({}).empty
+    assert get_race_results({"results": "corrupted_string"}).empty
+    assert get_race_results({"results": 12345}).empty
+    assert get_race_results({"results": None}).empty
+    valid_data = {"results": [{"position": 1, "driver": "VER", "team": "Red Bull Racing"}]}
+    df = get_race_results(valid_data)
+    assert not df.empty
+    assert df.iloc[0]["driver"] == "VER"
+
+
+def test_get_drivers_from_session_malformed_or_corrupt() -> None:
+    """Verify get_drivers_from_session gracefully handles None, non-dict, and non-list results."""
+    assert get_drivers_from_session(None).empty
+    assert get_drivers_from_session({}).empty
+    assert get_drivers_from_session({"results": "corrupted_string"}).empty
+    assert get_drivers_from_session({"results": 42}).empty
+    assert get_drivers_from_session({"results": None}).empty
+    valid_data = {
+        "results": [
+            {"driver": "VER", "driver_number": "1", "team": "Red Bull Racing"},
+            {"driver": "VER", "driver_number": "1", "team": "Red Bull Racing"},
+        ]
+    }
+    df = get_drivers_from_session(valid_data)
+    assert len(df) == 1
+    assert df.iloc[0]["driver"] == "VER"
+

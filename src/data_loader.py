@@ -210,22 +210,30 @@ def get_qualifying_results(session_data: dict[str, Any] | None) -> pd.DataFrame:
 
 def get_race_results(session_data: dict[str, Any] | None) -> pd.DataFrame:
     """Convert race or sprint session results to a DataFrame."""
-    if not session_data or "results" not in session_data or not session_data["results"]:
+    if not session_data or not isinstance(session_data, dict):
         return pd.DataFrame()
-    return pd.DataFrame(session_data["results"])
+    raw_results = session_data.get("results")
+    if not isinstance(raw_results, list) or not raw_results:
+        return pd.DataFrame()
+    return pd.DataFrame(raw_results)
 
 
 def get_drivers_from_session(session_data: dict[str, Any] | None) -> pd.DataFrame:
     """Extract driver code, number, and team from session results."""
-    if not session_data or "results" not in session_data:
+    if not session_data or not isinstance(session_data, dict):
         return pd.DataFrame()
 
-    results = pd.DataFrame(session_data["results"])
+    raw_results = session_data.get("results")
+    if not isinstance(raw_results, list) or not raw_results:
+        return pd.DataFrame()
+
+    results = pd.DataFrame(raw_results)
     if results.empty:
         return pd.DataFrame()
 
     driver_cols = [c for c in ["driver", "driver_number", "team"] if c in results.columns]
     return results[driver_cols].drop_duplicates()
+
 
 
 def resolve_starting_grid(gp_data: dict[str, Any]) -> pd.DataFrame:
