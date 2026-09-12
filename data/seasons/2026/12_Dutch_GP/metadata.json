@@ -1,0 +1,20 @@
+{
+  "sessions": {
+    "SQ": {
+      "status": "complete",
+      "fetched_at": "2026-09-12T18:25:13.010798"
+    },
+    "S": {
+      "status": "complete",
+      "fetched_at": "2026-09-12T18:25:24.015058"
+    },
+    "Q": {
+      "status": "complete",
+      "fetched_at": "2026-09-12T18:25:33.093347"
+    },
+    "R": {
+      "status": "complete",
+      "fetched_at": "2026-09-12T18:25:46.981600"
+    }
+  }
+}

@@ -2,14 +2,14 @@ name: Weekly F1 Model Update
 
 on:
   schedule:
-    # Run every Monday at 12:00 UTC (the day after a race weekend)
+    # Run every Monday at 12:00 UTC (following race weekends)
     - cron: '0 12 * * 1'
   workflow_dispatch:
 
 jobs:
   update-model:
     runs-on: ubuntu-latest
-    
+
     permissions:
       contents: write
 
@@ -17,10 +17,10 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.11
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.12'
         cache: 'pip'
 
     - name: Install Dependencies
@@ -28,26 +28,31 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Run Quality Verification
+      run: |
+        ruff check .
+        pytest -v
+
     - name: Download Latest Race Data
       run: python scripts/download_historical_data.py
 
     - name: Retrain Historical Model
       run: python scripts/train_historical_model.py
 
+    - name: Validate Model and Pipeline
+      run: pytest -v
+
     - name: Commit and Push Changes
       run: |
-        # Configure Git to act as a GitHub bot
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        
-        # Stage only the extracted data and the new model
+
         git add data/seasons/
         git add data/models/f1_historical_model.joblib
-        
-        # Check if there are actual changes before trying to commit
+
         if git diff --staged --quiet; then
-          echo "No new race data found. Model is already up to date!"
+          echo "No new race data or model changes detected."
         else
-          git commit -m "Auto-update: Extracted latest race data & retrained ML model"
+          git commit -m "chore(model): retrain historical model with latest race data"
           git push
         fi

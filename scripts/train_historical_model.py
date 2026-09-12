@@ -1,223 +1,272 @@
+"""Historical Model Training and Temporal Validation Pipeline.
+
+Trains the production Random Forest regressor with temporal (season-aware) splitting,
+statistically valid DNF handling, and atomic artifact replacement.
+"""
+
+import logging
 import os
 import sys
-import json
+from pathlib import Path
+from typing import Any
+
+import joblib
 import numpy as np
 import pandas as pd
-import joblib
-from pathlib import Path
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    mean_absolute_error,
+    mean_squared_error,
+    precision_score,
+    recall_score,
+)
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Ensure repository root is on sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.data_fetcher import DATA_DIR
-from src.data_loader import aggregate_practice_pace
+from src.config import MODELS_DIR, SEASONS_DIR
+from src.data_loader import build_weekend_features, load_gp_data
 from src.model import F1MLPredictor
 
-def load_json(filepath):
-    if not os.path.exists(filepath):
-        return None
-    try:
-        with open(filepath, 'r') as f:
-            return json.load(f)
-    except:
-        return None
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger("TrainPipeline")
 
-def extract_race_results(race_data):
-    if not race_data or 'results' not in race_data:
+
+def extract_classified_race_results(race_session: dict[str, Any] | None) -> dict[str, int]:
+    """Extract finishing positions strictly for classified race finishers.
+
+    Excludes mechanical DNFs and crash retirements to prevent target corruption.
+    """
+    if not race_session or "results" not in race_session:
         return {}
-    results = {}
-    for row in race_data['results']:
-        driver = row.get('driver')
-        pos = row.get('position')
-        if driver and pos:
-            try:
-                results[driver] = int(float(pos))
-            except ValueError:
-                # DNF, NC, etc. - assign a high position
-                results[driver] = 20
-    return results
 
-def extract_grid_positions(quali_data):
-    if not quali_data or 'results' not in quali_data:
-        return {}
-    results = {}
-    for row in quali_data['results']:
-        driver = row.get('driver')
-        pos = row.get('position')
-        if driver and pos:
-            try:
-                results[driver] = int(float(pos))
-            except ValueError:
-                results[driver] = 20
-    return results
+    classified_finishes: dict[str, int] = {}
+    for entry in race_session["results"]:
+        driver = entry.get("driver")
+        pos = entry.get("position")
+        status = str(entry.get("status", "")).strip()
 
-def main():
-    print("Starting Historical Model Training Pipeline")
-    
-    # 1. Load all historical GPs
-    seasons_dir = Path(DATA_DIR)
-    
-    if not seasons_dir.exists():
-        print(f"Data directory not found: {seasons_dir}")
-        return
+        if not driver or pos is None:
+            continue
 
-    all_features = []
-    all_targets = []
-    
-    total_gps = 0
-    
-    print("Extracting features from historical races...")
-    
-    # Initialize predictor once outside the loop to prevent spam
+        try:
+            pos_int = int(float(pos))
+        except (ValueError, TypeError):
+            continue
+
+        # Status indicating classified finisher (Finished or completed lap distance)
+        is_classified = (
+            status == "Finished"
+            or status.startswith("+")
+            or "Lap" in status
+            or (pos_int <= 16 and status not in ["Did not start", "Disqualified"])
+        )
+
+        if is_classified:
+            classified_finishes[driver] = pos_int
+
+    return classified_finishes
+
+
+def load_dataset() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Extract feature vectors and target labels partitioned by temporal seasons.
+
+    Train: 2022-2024 seasons (historical baseline)
+    Validation: 2025 season (tuning and calibration)
+    Test: 2026 season (unseen out-of-time evaluation)
+    """
     predictor = F1MLPredictor()
-    
-    # Iterate through all seasons and GPs
-    for year_dir in sorted(seasons_dir.iterdir()):
+    train_rows: list[dict[str, Any]] = []
+    val_rows: list[dict[str, Any]] = []
+    test_rows: list[dict[str, Any]] = []
+
+    if not SEASONS_DIR.exists():
+        logger.error("Seasons data directory does not exist: %s", SEASONS_DIR)
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+    total_gps = 0
+
+    for year_dir in sorted(SEASONS_DIR.iterdir()):
         if not year_dir.is_dir() or not year_dir.name.isdigit():
             continue
-            
+
+        season_year = int(year_dir.name)
+
         for gp_dir in sorted(year_dir.iterdir()):
-            if not gp_dir.is_dir():
+            if not gp_dir.is_dir() or gp_dir.name.startswith("."):
                 continue
-                
-            # Load necessary files
-            fp1 = load_json(gp_dir / "fp1.json")
-            fp2 = load_json(gp_dir / "fp2.json")
-            fp3 = load_json(gp_dir / "fp3.json")
-            quali = load_json(gp_dir / "qualifying.json")
-            sprint_quali = load_json(gp_dir / "sprint_qualifying.json")
-            sprint_shootout = load_json(gp_dir / "sprint_shootout.json")
-            race = load_json(gp_dir / "race.json")
-            
-            if not race:
+
+            gp_data = load_gp_data(season_year, gp_dir.name)
+            sessions = gp_data.get("sessions", {})
+            race_session = sessions.get("race")
+            if not race_session:
                 continue
-                
-            grid_data = quali if quali else (sprint_quali if sprint_quali else sprint_shootout)
-            if not grid_data:
+
+            classified_results = extract_classified_race_results(race_session)
+            if not classified_results:
                 continue
-                
-            grid_positions = extract_grid_positions(grid_data)
-            race_positions = extract_race_results(race)
-            
-            # Aggregate practice pace
-            gp_data = {"sessions": {}}
-            if fp1: gp_data["sessions"]["fp1"] = fp1
-            if fp2: gp_data["sessions"]["fp2"] = fp2
-            if fp3: gp_data["sessions"]["fp3"] = fp3
-            
-            pace_df = aggregate_practice_pace(gp_data)
-            
-            if pace_df.empty:
+
+            # Construct grid-anchored pre-race features
+            weekend_features = build_weekend_features(gp_data)
+            if weekend_features.empty:
                 continue
-                
-            # Combine into a single DataFrame for this GP
-            drivers = list(race_positions.keys())
-            
-            gp_features = []
-            for d in drivers:
-                if d not in grid_positions:
-                    continue
-                    
-                row = {
-                    "driver": d,
-                    "grid": grid_positions[d],
-                }
-                
-                pace_row = pace_df[pace_df["driver"] == d]
-                if not pace_row.empty:
-                    row["best"] = pace_row.iloc[0].get("best", None)
-                    row["avg"] = pace_row.iloc[0].get("avg", None)
-                else:
-                    # Missing practice data, assume average or back of pack
-                    continue
-                    
-                if pd.isna(row["best"]) or pd.isna(row["avg"]):
-                    continue
-                    
-                gp_features.append(row)
-                all_targets.append(race_positions[d])
-            
-            if not gp_features:
-                continue
-                
-            gp_df = pd.DataFrame(gp_features)
-            
-            features_df, X_gp = predictor._engineer_features(gp_df)
-            
-            for x_row in X_gp:
-                all_features.append(x_row)
-                
+
+            # Engineer normalized ML features
+            features_df, _X_matrix = predictor._engineer_features(weekend_features)
+
+            for idx, row in features_df.iterrows():
+                driver = row["driver"]
+                if driver in classified_results:
+                    target_pos = classified_results[driver]
+                    sample = {
+                        "season": season_year,
+                        "gp": gp_dir.name,
+                        "driver": driver,
+                        "target_position": target_pos,
+                    }
+                    for f_name in predictor.feature_names:
+                        sample[f_name] = row[f_name]
+
+                    if season_year <= 2024:
+                        train_rows.append(sample)
+                    elif season_year == 2025:
+                        val_rows.append(sample)
+                    else:
+                        test_rows.append(sample)
+
             total_gps += 1
-            
-    if not all_features:
-        print("No valid training data found.")
-        return
-        
-    X_train = np.array(all_features)
-    y_train = np.array(all_targets)
-    
-    print(f"Extracted data from {total_gps} Grand Prix events.")
-    print(f"Total training samples: {len(X_train)} driver performances.")
-    
-    # 2. Train the Model
-    print("Training RandomForest model...")
-    from sklearn.ensemble import RandomForestRegressor
-    
+
+    logger.info("Extracted features across %d Grand Prix events", total_gps)
+    return pd.DataFrame(train_rows), pd.DataFrame(val_rows), pd.DataFrame(test_rows)
+
+
+def evaluate_model_partition(
+    model: RandomForestRegressor,
+    df_partition: pd.DataFrame,
+    feature_names: list[str],
+    partition_name: str,
+) -> dict[str, float]:
+    """Compute statistically rigorous evaluation metrics on a dataset partition."""
+    if df_partition.empty:
+        logger.warning("Partition %s is empty; skipping evaluation.", partition_name)
+        return {}
+
+    X = df_partition[feature_names].values
+    y_true = df_partition["target_position"].values
+    y_pred = model.predict(X)
+
+    mae = float(mean_absolute_error(y_true, y_pred))
+    rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
+    r2 = float(model.score(X, y_true))
+
+    y_pred_rounded = np.clip(np.round(y_pred), 1, 20)
+
+    # Top-10 Points Finish Classification Metrics
+    y_true_pts = (y_true <= 10).astype(int)
+    y_pred_pts = (y_pred_rounded <= 10).astype(int)
+
+    pts_acc = float(accuracy_score(y_true_pts, y_pred_pts))
+    pts_f1 = float(f1_score(y_true_pts, y_pred_pts, zero_division=0))
+    pts_prec = float(precision_score(y_true_pts, y_pred_pts, zero_division=0))
+    pts_rec = float(recall_score(y_true_pts, y_pred_pts, zero_division=0))
+
+    # Top-3 Podium Classification Metrics with Baseline Comparison
+    y_true_podium = (y_true <= 3).astype(int)
+    y_pred_podium = (y_pred_rounded <= 3).astype(int)
+
+    podium_acc = float(accuracy_score(y_true_podium, y_pred_podium))
+    podium_f1 = float(f1_score(y_true_podium, y_pred_podium, zero_division=0))
+    podium_prec = float(precision_score(y_true_podium, y_pred_podium, zero_division=0))
+    podium_rec = float(recall_score(y_true_podium, y_pred_podium, zero_division=0))
+
+    # Baseline: Dummy classifier predicting 0 (No Podium)
+    dummy_no_podium = np.zeros_like(y_true_podium)
+    baseline_podium_acc = float(accuracy_score(y_true_podium, dummy_no_podium))
+
+    print(f"\n--- {partition_name.upper()} EVALUATION METRICS (Samples: {len(df_partition)}) ---")
+    print(f"R-squared Score:           {r2:.3f}")
+    print(f"Mean Absolute Error:        {mae:.2f} positions")
+    print(f"Root Mean Squared Error:    {rmse:.2f} positions")
+    print(
+        f"Points Finish (Top 10) Acc: {pts_acc * 100:.1f}% (F1: {pts_f1:.3f}, Precision: {pts_prec:.3f}, Recall: {pts_rec:.3f})"
+    )
+    print(f"Podium (Top 3) Accuracy:    {podium_acc * 100:.1f}% (Baseline Dummy: {baseline_podium_acc * 100:.1f}%)")
+    print(f"Podium Prediction F1:       {podium_f1:.3f} (Precision: {podium_prec:.3f}, Recall: {podium_rec:.3f})")
+    print("-" * 65)
+
+    return {
+        "r2": r2,
+        "mae": mae,
+        "rmse": rmse,
+        "points_acc": pts_acc,
+        "points_f1": pts_f1,
+        "podium_acc": podium_acc,
+        "podium_f1": podium_f1,
+        "baseline_podium_acc": baseline_podium_acc,
+    }
+
+
+def main() -> bool:
+    """Execute historical training and validation pipeline."""
+    logger.info("Starting F1 Predictor Model Training Pipeline")
+
+    train_df, val_df, test_df = load_dataset()
+    if train_df.empty:
+        logger.error("No valid historical training data extracted.")
+        return False
+
+    feature_names = ["grid_norm", "pace_norm", "pace_consistency", "has_practice_data", "is_sprint"]
+
+    X_train = train_df[feature_names].values
+    y_train = train_df["target_position"].values
+
+    logger.info("Training set: %d samples from 2022-2024", len(X_train))
+    logger.info("Validation set: %d samples from 2025", len(val_df))
+    logger.info("Test set: %d samples from 2026", len(test_df))
+
+    # Initialize production Random Forest Regressor
     model = RandomForestRegressor(
         n_estimators=300,
-        max_depth=4,
-        min_samples_split=10,
-        min_samples_leaf=1,
+        max_depth=5,
+        min_samples_split=8,
+        min_samples_leaf=2,
         max_features="sqrt",
         random_state=42,
-        n_jobs=-1
+        n_jobs=-1,
     )
-    
+
     model.fit(X_train, y_train)
-    
-    score = model.score(X_train, y_train)
-    
-    from sklearn.metrics import mean_absolute_error, mean_squared_error, accuracy_score, f1_score
-    
-    y_pred = model.predict(X_train)
-    
-    mae = mean_absolute_error(y_train, y_pred)
-    rmse = np.sqrt(mean_squared_error(y_train, y_pred))
-    
-    # Round predictions to nearest integer for classification metrics
-    y_pred_rounded = np.clip(np.round(y_pred), 1, 20)
-    
-    exact_accuracy = accuracy_score(y_train, y_pred_rounded)
-    
-    # Podium predictions (Top 3)
-    y_train_podium = (y_train <= 3)
-    y_pred_podium = (y_pred_rounded <= 3)
-    podium_accuracy = accuracy_score(y_train_podium, y_pred_podium)
-    podium_f1 = f1_score(y_train_podium, y_pred_podium)
-    
-    # Points finish (Top 10)
-    y_train_points = (y_train <= 10)
-    y_pred_points = (y_pred_rounded <= 10)
-    points_accuracy = accuracy_score(y_train_points, y_pred_points)
-    points_f1 = f1_score(y_train_points, y_pred_points)
-    
-    print("\n--- Detailed Model Performance Metrics ---")
-    print(f"R² Score:              {score:.3f}")
-    print(f"Mean Absolute Error:   {mae:.2f} positions")
-    print(f"Root Mean Squared Err: {rmse:.2f} positions")
-    print(f"Exact Position Acc:    {exact_accuracy*100:.1f}%")
-    print(f"Podium Prediction Acc: {podium_accuracy*100:.1f}% (F1: {podium_f1:.3f})")
-    print(f"Points Finish Acc:     {points_accuracy*100:.1f}% (F1: {points_f1:.3f})")
-    print("------------------------------------------\n")
-    
-    # 3. Save the Model
-    models_dir = Path(DATA_DIR).parent / "models"
-    models_dir.mkdir(exist_ok=True)
-    
-    model_path = models_dir / "f1_historical_model.joblib"
-    joblib.dump(model, model_path)
-    
-    print(f"Model successfully saved to {model_path}")
-    print("You can now restart the Streamlit app to use the real-data model!")
+
+    # Evaluate across all temporal partitions
+    evaluate_model_partition(model, train_df, feature_names, "Training Set (2022-2024 In-Sample)")
+    evaluate_model_partition(model, val_df, feature_names, "Validation Set (2025 Out-of-Time)")
+    evaluate_model_partition(model, test_df, feature_names, "Test Set (2026 Out-of-Time)")
+
+    # Model Artifact Validation
+    test_sample = np.array([[0.0, 0.0, 0.1, 1.0, 0.0], [0.95, 0.9, 0.5, 1.0, 0.0]])
+    test_preds = model.predict(test_sample)
+
+    if np.isnan(test_preds).any() or np.isinf(test_preds).any():
+        logger.error("Model verification failed: predictions contain NaN or Inf values.")
+        return False
+
+    if test_preds[0] > test_preds[1]:
+        logger.warning("Sanity warning: Pole position expected to predict lower rank than P20.")
+
+    # Atomic artifact serialization
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    temp_artifact_path = MODELS_DIR / "f1_historical_model.tmp.joblib"
+    final_artifact_path = MODELS_DIR / "f1_historical_model.joblib"
+
+    joblib.dump(model, temp_artifact_path)
+    os.replace(temp_artifact_path, final_artifact_path)
+
+    logger.info("Model artifact successfully validated and atomically written to %s", final_artifact_path)
+    return True
+
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    sys.exit(0 if success else 1)

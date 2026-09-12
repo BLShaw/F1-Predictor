@@ -1,86 +1,75 @@
-"""
-This module provides functions to load session data from JSON files
-organized by season and Grand Prix.
+"""F1 Data Loader Module.
+
+Framework-agnostic functions to load and transform Grand Prix session data from disk.
 """
 
 import json
 import logging
-import streamlit as st
 from pathlib import Path
-from typing import Optional, Dict, List, Any, Tuple
+from typing import Any
+
 import pandas as pd
 
-# Configure logging
+from src.config import SEASONS_DIR, get_team_for_driver
+
 logger = logging.getLogger(__name__)
 
-# Data directories
-DATA_DIR = Path(__file__).parent.parent / "data"
-SEASONS_DIR = DATA_DIR / "seasons"
 
-
-def get_available_seasons() -> List[int]:
-    """Get list of seasons with data available."""
-    if not SEASONS_DIR.exists():
+def get_available_seasons(seasons_path: Path = SEASONS_DIR) -> list[int]:
+    """Get sorted list of seasons with available local JSON data."""
+    if not seasons_path.exists():
         return []
-    
-    seasons = []
-    for folder in SEASONS_DIR.iterdir():
+
+    seasons: list[int] = []
+    for folder in seasons_path.iterdir():
         if folder.is_dir() and folder.name.isdigit():
             seasons.append(int(folder.name))
-    
+
     return sorted(seasons, reverse=True)
 
 
-@st.cache_data
-def get_season_schedule(year: int) -> List[Dict]:
-    """Load season schedule from JSON."""
-    schedule_path = SEASONS_DIR / str(year) / "schedule.json"
-    
+def get_season_schedule(year: int, seasons_path: Path = SEASONS_DIR) -> list[dict[str, Any]]:
+    """Load season calendar schedule from JSON file."""
+    schedule_path = seasons_path / str(year) / "schedule.json"
     if schedule_path.exists():
-        with open(schedule_path, 'r') as f:
-            return json.load(f)
-    
+        try:
+            with open(schedule_path, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as exc:
+            logger.warning("Failed to load schedule for %d: %s", year, exc)
     return []
 
 
-def get_available_gps(year: int) -> List[Dict]:
-    """
-    Get list of GPs with data for a season.
-    
-    Returns:
-        List of dicts with round, name, folder, and available sessions
-    """
-    season_path = SEASONS_DIR / str(year)
-    
+def get_available_gps(year: int, seasons_path: Path = SEASONS_DIR) -> list[dict[str, Any]]:
+    """Get list of Grand Prix events with round number and available sessions."""
+    season_path = seasons_path / str(year)
     if not season_path.exists():
         return []
-    
-    gps = []
+
+    gps: list[dict[str, Any]] = []
     for folder in sorted(season_path.iterdir()):
         if folder.is_dir() and not folder.name.startswith("."):
-            # Parse folder name (e.g., "01_Bahrain_GP")
             parts = folder.name.split("_", 1)
             if len(parts) == 2 and parts[0].isdigit():
                 round_num = int(parts[0])
                 gp_name = parts[1].replace("_", " ")
-                
-                # Check which sessions are available
-                sessions = get_available_sessions(year, folder.name)
-                
-                gps.append({
-                    "round": round_num,
-                    "name": gp_name,
-                    "folder": folder.name,
-                    "sessions": sessions
-                })
-    
+                sessions = get_available_sessions(year, folder.name, seasons_path)
+
+                gps.append(
+                    {
+                        "round": round_num,
+                        "name": gp_name,
+                        "folder": folder.name,
+                        "sessions": sessions,
+                    }
+                )
+
     return sorted(gps, key=lambda x: x["round"])
 
 
-def get_available_sessions(year: int, gp_folder: str) -> Dict[str, bool]:
-    """Check which session JSON files exist for a GP."""
-    gp_path = SEASONS_DIR / str(year) / gp_folder
-    
+def get_available_sessions(year: int, gp_folder: str, seasons_path: Path = SEASONS_DIR) -> dict[str, bool]:
+    """Check which session JSON files exist for a Grand Prix event."""
+    gp_path = seasons_path / str(year) / gp_folder
     session_files = {
         "fp1": "fp1.json",
         "fp2": "fp2.json",
@@ -89,262 +78,328 @@ def get_available_sessions(year: int, gp_folder: str) -> Dict[str, bool]:
         "sprint_qualifying": "sprint_qualifying.json",
         "sprint_shootout": "sprint_shootout.json",
         "sprint": "sprint.json",
-        "race": "race.json"
+        "race": "race.json",
     }
-    
-    available = {}
-    for session_name, filename in session_files.items():
-        available[session_name] = (gp_path / filename).exists()
-    
-    return available
+    return {session_name: (gp_path / filename).exists() for session_name, filename in session_files.items()}
 
 
-def load_session(year: int, gp_folder: str, session_type: str) -> Optional[Dict]:
-    """
-    Load a single session from JSON file.
-    
-    Args:
-        year: Season year
-        gp_folder: GP folder name (e.g., "01_Bahrain_GP")
-        session_type: One of fp1, fp2, fp3, qualifying, sprint, race
-    
-    Returns:
-        Session data dictionary or None
-    """
-    gp_path = SEASONS_DIR / str(year) / gp_folder
+def load_session(
+    year: int, gp_folder: str, session_type: str, seasons_path: Path = SEASONS_DIR
+) -> dict[str, Any] | None:
+    """Load a single session from a JSON file."""
+    gp_path = seasons_path / str(year) / gp_folder
     session_path = gp_path / f"{session_type}.json"
-    
+
     if session_path.exists():
-        with open(session_path, 'r') as f:
-            return json.load(f)
-    
+        try:
+            with open(session_path, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as exc:
+            logger.warning("Failed to load session %s from %s: %s", session_type, session_path, exc)
     return None
 
 
-@st.cache_data
-def load_gp_data(year: int, gp_folder: str) -> Dict[str, Any]:
-    """
-    Load all available session data for a GP.
-    
-    Returns:
-        Dict with session_type: session_data for all available sessions
-    """
-    sessions = get_available_sessions(year, gp_folder)
-    
-    gp_data = {
+def load_gp_data(year: int, gp_folder: str, seasons_path: Path = SEASONS_DIR) -> dict[str, Any]:
+    """Load all available session data and metadata for a Grand Prix."""
+    sessions = get_available_sessions(year, gp_folder, seasons_path)
+
+    gp_data: dict[str, Any] = {
         "year": year,
         "gp_folder": gp_folder,
-        "sessions": {}
+        "sessions": {},
     }
-    
+
     for session_type, is_available in sessions.items():
         if is_available:
-            gp_data["sessions"][session_type] = load_session(year, gp_folder, session_type)
-    
-    # Load metadata if available
-    metadata_path = SEASONS_DIR / str(year) / gp_folder / "metadata.json"
+            loaded = load_session(year, gp_folder, session_type, seasons_path)
+            if loaded is not None:
+                gp_data["sessions"][session_type] = loaded
+
+    metadata_path = seasons_path / str(year) / gp_folder / "metadata.json"
     if metadata_path.exists():
-        with open(metadata_path, 'r') as f:
-            gp_data["metadata"] = json.load(f)
-    
+        try:
+            with open(metadata_path, encoding="utf-8") as f:
+                gp_data["metadata"] = json.load(f)
+        except Exception:
+            gp_data["metadata"] = {}
+
     return gp_data
 
 
-def get_driver_best_times(session_data: Dict) -> Dict[str, float]:
-    """Extract best lap times per driver from session data."""
+def get_driver_best_times(session_data: dict[str, Any] | None) -> dict[str, float]:
+    """Extract best lap times per driver from session dictionary."""
     if not session_data or "best_times" not in session_data:
         return {}
     return session_data.get("best_times", {})
 
 
-def get_qualifying_results(session_data: Dict) -> pd.DataFrame:
-    """Convert qualifying session to DataFrame with Q1/Q2/Q3 times."""
-    if not session_data or "results" not in session_data:
+def get_qualifying_results(session_data: dict[str, Any] | None) -> pd.DataFrame:
+    """Convert qualifying or sprint shootout session results to a DataFrame.
+
+    If stored session results lack classified positions or lap times, attempts to
+    reconstruct the classification using session best lap times and driver team mappings.
+    """
+    if not session_data or not isinstance(session_data, dict):
         return pd.DataFrame()
-    
+
+    results = session_data.get("results")
+    raw_best_times = session_data.get("best_times")
+    best_times: dict[str, float] = raw_best_times if isinstance(raw_best_times, dict) else {}
+
+    session_name = str(session_data.get("session_name", "")).lower()
+    is_shootout = session_data.get("session_type") in ("SQ", "SS") or "sprint" in session_name
+    primary_phase_col = "sq1" if is_shootout else "q1"
+
+    if results and isinstance(results, list):
+        df = pd.DataFrame(results)
+    elif best_times:
+        sorted_times = sorted(
+            best_times.items(),
+            key=lambda x: (x[1] is None, x[1] if x[1] is not None else float("inf")),
+        )
+        rows = [
+            {
+                "position": idx,
+                "driver": drv,
+                "team": get_team_for_driver(drv),
+                primary_phase_col: t,
+            }
+            for idx, (drv, t) in enumerate(sorted_times, 1)
+        ]
+        return pd.DataFrame(rows)
+    else:
+        return pd.DataFrame()
+
+    if df.empty:
+        return df
+
+    # Populate phase lap times from best_times if phase times are absent
+    has_times = any(c in df.columns for c in ["q1", "q2", "q3", "sq1", "sq2", "sq3"])
+    if not has_times and best_times and "driver" in df.columns:
+        df[primary_phase_col] = df["driver"].map(best_times)
+
+    # Reconstruct rank order if positions are unassigned or null
+    has_valid_positions = "position" in df.columns and df["position"].notna().any()
+    if not has_valid_positions:
+        time_col = None
+        for col in ["q3", "sq3", "q2", "sq2", "q1", "sq1"]:
+            if col in df.columns and df[col].notna().any():
+                time_col = col
+                break
+
+        if time_col:
+            df = df.sort_values(time_col, na_position="last").reset_index(drop=True)
+            df["position"] = range(1, len(df) + 1)
+        elif best_times and "driver" in df.columns:
+            df["_sort_time"] = df["driver"].map(best_times)
+            df = df.sort_values("_sort_time", na_position="last").reset_index(drop=True)
+            df["position"] = range(1, len(df) + 1)
+            df = df.drop(columns=["_sort_time"])
+
+    # Fallback to driver dictionary for missing team values
+    if "team" in df.columns and "driver" in df.columns:
+        df["team"] = df.apply(
+            lambda r: r["team"]
+            if pd.notna(r["team"]) and str(r["team"]).strip()
+            else get_team_for_driver(str(r["driver"])),
+            axis=1,
+        )
+
+    return df
+
+
+def get_race_results(session_data: dict[str, Any] | None) -> pd.DataFrame:
+    """Convert race or sprint session results to a DataFrame."""
+    if not session_data or "results" not in session_data or not session_data["results"]:
+        return pd.DataFrame()
     return pd.DataFrame(session_data["results"])
 
 
-def get_race_results(session_data: Dict) -> pd.DataFrame:
-    """Convert race session to DataFrame with results."""
+def get_drivers_from_session(session_data: dict[str, Any] | None) -> pd.DataFrame:
+    """Extract driver code, number, and team from session results."""
     if not session_data or "results" not in session_data:
         return pd.DataFrame()
-    
-    return pd.DataFrame(session_data["results"])
 
-
-def get_session_laps(session_data: Dict) -> pd.DataFrame:
-    """Convert session laps to DataFrame."""
-    if not session_data or "laps" not in session_data:
-        return pd.DataFrame()
-    
-    return pd.DataFrame(session_data["laps"])
-
-
-def aggregate_practice_pace(gp_data: Dict) -> pd.DataFrame:
-    """
-    Aggregate pace data from all practice sessions.
-    
-    Returns DataFrame with driver best times from FP1, FP2, FP3.
-    """
-    practice_sessions = ["fp1", "fp2", "fp3"]
-    pace_data = {}
-    
-    for session_type in practice_sessions:
-        if session_type in gp_data.get("sessions", {}):
-            session = gp_data["sessions"][session_type]
-            best_times = get_driver_best_times(session)
-            
-            for driver, time in best_times.items():
-                if driver not in pace_data:
-                    pace_data[driver] = {}
-                pace_data[driver][session_type] = time
-    
-    # Convert to DataFrame
-    if pace_data:
-        df = pd.DataFrame.from_dict(pace_data, orient="index")
-        df.index.name = "driver"
-        
-        # Get available practice columns
-        available_cols = [c for c in practice_sessions if c in df.columns]
-        
-        # Calculate overall best and average (only from available sessions)
-        if available_cols:
-            df["best"] = df[available_cols].min(axis=1)
-            df["avg"] = df[available_cols].mean(axis=1)
-        else:
-            # No valid columns, return empty
-            return pd.DataFrame()
-        
-        return df.reset_index()
-    
-    return pd.DataFrame()
-
-
-def get_historical_gp_data(gp_name: str, years: List[int] = None) -> List[Dict]:
-    """
-    Load historical data for a specific GP across multiple years.
-    Useful for predictions based on track-specific history.
-    
-    Args:
-        gp_name: Name to match (partial match supported)
-        years: List of years to search (default: all available)
-    
-    Returns:
-        List of GP data dicts from matching events
-    """
-    if years is None:
-        years = get_available_seasons()
-    
-    historical_data = []
-    
-    for year in years:
-        gps = get_available_gps(year)
-        for gp in gps:
-            if gp_name.lower() in gp["name"].lower():
-                gp_data = load_gp_data(year, gp["folder"])
-                gp_data["match_year"] = year
-                gp_data["match_name"] = gp["name"]
-                historical_data.append(gp_data)
-    
-    return historical_data
-
-
-@st.cache_data
-def load_static_data() -> Dict[str, Any]:
-    """Load static data files (only tracks.json remains)."""
-    static_data = {}
-    
-    # Only tracks.json is needed - driver/team info comes from FastF1
-    tracks_path = DATA_DIR / "tracks.json"
-    if tracks_path.exists():
-        with open(tracks_path, 'r') as f:
-            static_data["tracks"] = json.load(f)
-    
-    return static_data
-
-
-def get_drivers_from_session(session_data: Dict) -> pd.DataFrame:
-    """
-    Extract driver information from session results.
-    This replaces the need for static drivers.json.
-    """
-    if not session_data or "results" not in session_data:
-        return pd.DataFrame()
-    
     results = pd.DataFrame(session_data["results"])
-    
     if results.empty:
         return pd.DataFrame()
-    
-    # Extract driver columns
-    driver_cols = ["driver", "driver_number", "team"]
-    available_cols = [c for c in driver_cols if c in results.columns]
-    
-    return results[available_cols].drop_duplicates()
+
+    driver_cols = [c for c in ["driver", "driver_number", "team"] if c in results.columns]
+    return results[driver_cols].drop_duplicates()
 
 
-def get_teams_from_session(session_data: Dict) -> pd.DataFrame:
+def resolve_starting_grid(gp_data: dict[str, Any]) -> pd.DataFrame:
+    """Resolve the authentic starting grid for the Sunday Grand Prix.
+
+    Accounts for 2022 Sporting Regulations where Saturday Sprint determined the Sunday grid.
+    For 2023+, Qualifying determines the Sunday Grand Prix grid.
     """
-    Extract team information from session results.
-    This replaces the need for static teams.json.
-    """
-    if not session_data or "results" not in session_data:
-        return pd.DataFrame()
-    
-    results = pd.DataFrame(session_data["results"])
-    
-    if results.empty or "team" not in results.columns:
-        return pd.DataFrame()
-    
-    return results[["team"]].drop_duplicates()
+    sessions = gp_data.get("sessions", {})
+    year = gp_data.get("year", 2024)
+
+    # 2022 Sprint Weekend: Sprint race results set the Sunday Grand Prix starting grid
+    if year == 2022 and "sprint" in sessions:
+        sprint_results = get_race_results(sessions["sprint"])
+        if not sprint_results.empty and "position" in sprint_results.columns:
+            grid_df = sprint_results[["driver", "position", "team"]].copy()
+            grid_df = grid_df.rename(columns={"position": "grid"})
+            grid_df["grid"] = pd.to_numeric(grid_df["grid"], errors="coerce")
+            grid_df = grid_df.dropna(subset=["grid"])
+            if not grid_df.empty:
+                return grid_df.sort_values("grid").reset_index(drop=True)
+
+    # Standard / 2023+ Sprint: Qualifying sets the Sunday Grand Prix starting grid
+    if "qualifying" in sessions:
+        quali_results = get_qualifying_results(sessions["qualifying"])
+        if not quali_results.empty and "position" in quali_results.columns:
+            grid_df = quali_results[["driver", "position"]].copy()
+            grid_df = grid_df.rename(columns={"position": "grid"})
+            if "team" in quali_results.columns:
+                grid_df["team"] = quali_results["team"]
+            else:
+                grid_df["team"] = ""
+            grid_df["grid"] = pd.to_numeric(grid_df["grid"], errors="coerce")
+            grid_df = grid_df.dropna(subset=["grid"])
+            if not grid_df.empty:
+                return grid_df.sort_values("grid").reset_index(drop=True)
+
+    # Fallback to Sprint Qualifying or Sprint Shootout if full Qualifying is absent
+    for sq_type in ["sprint_qualifying", "sprint_shootout"]:
+        if sq_type in sessions:
+            sq_results = get_qualifying_results(sessions[sq_type])
+            if not sq_results.empty and "position" in sq_results.columns:
+                grid_df = sq_results[["driver", "position"]].copy()
+                grid_df = grid_df.rename(columns={"position": "grid"})
+                grid_df["team"] = sq_results.get("team", "")
+                grid_df["grid"] = pd.to_numeric(grid_df["grid"], errors="coerce")
+                grid_df = grid_df.dropna(subset=["grid"])
+                if not grid_df.empty:
+                    return grid_df.sort_values("grid").reset_index(drop=True)
+
+    # Ultimate fallback: grid_position from race.json if race already ran
+    if "race" in sessions:
+        race_results = get_race_results(sessions["race"])
+        if not race_results.empty and "grid_position" in race_results.columns:
+            grid_df = race_results[["driver", "grid_position", "team"]].copy()
+            grid_df = grid_df.rename(columns={"grid_position": "grid"})
+            grid_df["grid"] = pd.to_numeric(grid_df["grid"], errors="coerce")
+            grid_df = grid_df.dropna(subset=["grid"])
+            if not grid_df.empty:
+                return grid_df.sort_values("grid").reset_index(drop=True)
+
+    return pd.DataFrame(columns=["driver", "grid", "team"])
 
 
-# Backward compatibility functions
-def prepare_features_from_gp(gp_data: Dict, target_session: str = "race") -> Tuple[pd.DataFrame, pd.DataFrame]:
+def aggregate_practice_pace(gp_data: dict[str, Any]) -> pd.DataFrame:
+    """Aggregate pace data from practice sessions (FP1, FP2, FP3).
+
+    Calculates best lap time, stint consistency (standard deviation),
+    and whether only a single practice session was held (e.g. sprint weekends).
     """
-    Prepare features and target for ML model from GP data.
-    
-    Uses practice and qualifying data to predict race results.
-    """
-    # Get practice pace
-    practice_pace = aggregate_practice_pace(gp_data)
-    
-    # Get qualifying results
-    quali_data = None
-    if "qualifying" in gp_data.get("sessions", {}):
-        quali_data = get_qualifying_results(gp_data["sessions"]["qualifying"])
-    
-    # Get target (race results)
-    target = None
-    if target_session in gp_data.get("sessions", {}):
-        target = get_race_results(gp_data["sessions"][target_session])
-    
-    if practice_pace.empty or quali_data is None or quali_data.empty:
-        return pd.DataFrame(), pd.DataFrame()
-    
-    # Merge features - check which columns exist
-    quali_cols = ["driver"]
-    if "position" in quali_data.columns:
-        quali_cols.append("position")
-    for qcol in ["q1", "q2", "q3"]:
-        if qcol in quali_data.columns:
-            quali_cols.append(qcol)
-    
-    rename_map = {"position": "quali_pos"} if "position" in quali_cols else {}
-    
-    features = practice_pace.merge(
-        quali_data[quali_cols].rename(columns=rename_map),
-        on="driver",
-        how="inner"
-    )
-    
-    # Prepare target if race data available
-    if target is not None and not target.empty:
-        features = features.merge(
-            target[["driver", "position"]].rename(columns={"position": "race_pos"}),
-            on="driver",
-            how="inner"
+    sessions = gp_data.get("sessions", {})
+    practice_keys = ["fp1", "fp2", "fp3"]
+
+    available_fp = [k for k in practice_keys if sessions.get(k)]
+    if not available_fp:
+        return pd.DataFrame(columns=["driver", "best", "avg", "consistency", "is_single_practice"])
+
+    is_single_practice = len(available_fp) == 1
+    driver_paces: dict[str, list[float]] = {}
+    stint_consistencies: dict[str, list[float]] = {}
+
+    for fp_key in available_fp:
+        session = sessions[fp_key]
+        best_times = get_driver_best_times(session)
+        pace_const_map = session.get("pace_consistency", {})
+
+        for driver, best_time in best_times.items():
+            if pd.notna(best_time) and best_time > 0:
+                driver_paces.setdefault(driver, []).append(float(best_time))
+
+        if isinstance(pace_const_map, dict):
+            for driver, stdev in pace_const_map.items():
+                if pd.notna(stdev) and stdev is not None and stdev > 0:
+                    stint_consistencies.setdefault(driver, []).append(float(stdev))
+
+    if not driver_paces:
+        return pd.DataFrame(columns=["driver", "best", "avg", "consistency", "is_single_practice"])
+
+    rows: list[dict[str, Any]] = []
+    for driver, times in driver_paces.items():
+        best_lap = float(min(times))
+        avg_lap = float(sum(times) / len(times))
+
+        driver_consistencies = stint_consistencies.get(driver, [])
+        if driver_consistencies:
+            consistency = float(sum(driver_consistencies) / len(driver_consistencies))
+        elif len(times) >= 2:
+            # Fallback consistency from variation between session bests
+            consistency = float(pd.Series(times).std())
+        else:
+            # Explicit indicator of unmeasured stint consistency
+            consistency = None
+
+        rows.append(
+            {
+                "driver": driver,
+                "best": round(best_lap, 3),
+                "avg": round(avg_lap, 3),
+                "consistency": round(consistency, 3) if consistency is not None else None,
+                "is_single_practice": is_single_practice,
+            }
         )
-    
-    return features, target
+
+    return pd.DataFrame(rows)
+
+
+def build_weekend_features(gp_data: dict[str, Any]) -> pd.DataFrame:
+    """Build pre-race feature set anchored to starting grid using LEFT JOIN.
+
+    Prevents silent driver deletion: drivers on grid without practice laps
+    are retained with missingness indicators and circuit-relative imputation.
+    """
+    grid_df = resolve_starting_grid(gp_data)
+    if grid_df.empty:
+        return pd.DataFrame()
+
+    pace_df = aggregate_practice_pace(gp_data)
+
+    # Grid-anchored merge (LEFT JOIN) preserves all qualified drivers
+    if not pace_df.empty:
+        features = grid_df.merge(pace_df, on="driver", how="left")
+    else:
+        features = grid_df.copy()
+        features["best"] = None
+        features["avg"] = None
+        features["consistency"] = None
+        features["is_single_practice"] = False
+
+    # Mark whether authentic practice pace was recorded
+    features["has_practice_data"] = features["best"].notna().astype(int)
+
+    # Circuit-relative pace imputation: 102% of slowest observed practice time
+    if features["best"].notna().any():
+        slowest_observed = float(features["best"].dropna().max())
+        float(features["best"].dropna().min())
+        imputed_best = slowest_observed * 1.02
+        features["best"] = features["best"].fillna(imputed_best)
+        features["avg"] = features["avg"].fillna(imputed_best)
+    else:
+        # If no practice took place, use grid rank ordinal
+        features["best"] = features["grid"].astype(float)
+        features["avg"] = features["grid"].astype(float)
+
+    # Fill consistency: median of observed consistencies or default neutral spread
+    features["consistency"] = pd.to_numeric(features["consistency"], errors="coerce")
+    if features["consistency"].notna().any():
+        med_consistency = float(features["consistency"].dropna().median())
+        features["consistency"] = features["consistency"].fillna(med_consistency)
+    else:
+        features["consistency"] = features["consistency"].fillna(0.35)
+
+    if "is_single_practice" not in features.columns:
+        features["is_single_practice"] = 0
+    else:
+        features["is_single_practice"] = features["is_single_practice"].astype(bool).astype(int)
+
+    return features.sort_values("grid").reset_index(drop=True)

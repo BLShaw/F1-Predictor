@@ -1,64 +1,71 @@
-import os
+"""Automated F1 Historical Data Downloader with rate-limit resiliency."""
+
+import json
+import logging
 import sys
 import time
-import logging
-import datetime
-import fastf1
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from datetime import datetime
 from pathlib import Path
-from src.data_fetcher import fetch_gp, SESSION_TYPES, DATA_DIR, get_gp_folder_name
+from typing import Any
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+import fastf1
+import pandas as pd
+
+# Ensure repository root is on sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from src.config import SEASONS_DIR
+from src.data_fetcher import SESSION_TYPES, fetch_gp, get_gp_folder_name
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("HistoricalDownloader")
 
 original_get_session = fastf1.get_session
 original_load = fastf1.core.Session.load
 original_get_event_schedule = fastf1.get_event_schedule
 
-def sleep_with_countdown(seconds):
-    """Sleep for a given number of seconds while displaying a live countdown."""
-    for remaining in range(seconds, 0, -1):
-        mins, secs = divmod(remaining, 60)
-        sys.stdout.write(f"\rTime remaining until retry: {mins:02d}:{secs:02d}  ")
-        sys.stdout.flush()
-        time.sleep(1)
-    sys.stdout.write("\r" + " " * 50 + "\r")
-    sys.stdout.flush()
 
-def handle_rate_limit(func, *args, **kwargs):
-    while True:
+def handle_rate_limit(func: Any, *args: Any, max_retries: int = 4, **kwargs: Any) -> Any:
+    """Execute FastF1 API call with exponential backoff on HTTP 429 / rate limits."""
+    for attempt in range(1, max_retries + 1):
         try:
             return func(*args, **kwargs)
-        except Exception as e:
-            msg = str(e).lower()
-            # API rate limit detection
-            if "429" in msg or "rate limit" in msg or "too many requests" in msg or "500 calls" in msg or "quota" in msg:
-                logger.warning(f"API RATE LIMIT DETECTED! Sleeping for 1 hour (3600 seconds)...")
-                logger.warning(f"Error details: {e}")
-                sleep_with_countdown(3600)
-                logger.info("Waking up and retrying the request...")
+        except Exception as exc:
+            msg = str(exc).lower()
+            is_rate_limit = any(
+                term in msg for term in ["429", "rate limit", "too many requests", "quota", "500 calls"]
+            )
+            if is_rate_limit and attempt < max_retries:
+                backoff_seconds = 30 * (2 ** (attempt - 1))
+                logger.warning(
+                    "API rate limit detected on attempt %d/%d. Backing off for %d seconds...",
+                    attempt,
+                    max_retries,
+                    backoff_seconds,
+                )
+                time.sleep(backoff_seconds)
             else:
-                # Re-raise if it's not a rate limit error
-                raise e
+                raise
 
-def patched_get_session(*args, **kwargs):
+
+def patched_get_session(*args: Any, **kwargs: Any) -> Any:
     return handle_rate_limit(original_get_session, *args, **kwargs)
 
-def patched_load(self, *args, **kwargs):
-    # self is the session object
+
+def patched_load(self: Any, *args: Any, **kwargs: Any) -> Any:
     return handle_rate_limit(original_load, self, *args, **kwargs)
 
-def patched_get_event_schedule(*args, **kwargs):
+
+def patched_get_event_schedule(*args: Any, **kwargs: Any) -> Any:
     return handle_rate_limit(original_get_event_schedule, *args, **kwargs)
 
-# Apply patches
+
+# Apply rate-limit resilient wrappers
 fastf1.get_session = patched_get_session
 fastf1.core.Session.load = patched_load
 fastf1.get_event_schedule = patched_get_event_schedule
 
 REVERSE_SESSION_TYPES = {v: k for k, v in SESSION_TYPES.items()}
-
 FILENAME_MAP = {
     "FP1": "fp1.json",
     "FP2": "fp2.json",
@@ -67,67 +74,93 @@ FILENAME_MAP = {
     "SQ": "sprint_qualifying.json",
     "SS": "sprint_shootout.json",
     "S": "sprint.json",
-    "R": "race.json"
+    "R": "race.json",
 }
 
-def get_scheduled_sessions(event):
-    """Determine which sessions are actually scheduled for this GP."""
-    scheduled = []
+
+def get_scheduled_sessions(event: Any) -> list[str]:
+    """Determine which sessions are scheduled for this Grand Prix event."""
+    scheduled: list[str] = []
     for i in range(1, 6):
-        session_name = event.get(f'Session{i}')
+        session_name = event.get(f"Session{i}")
         if session_name and session_name in REVERSE_SESSION_TYPES:
             scheduled.append(REVERSE_SESSION_TYPES[session_name])
     return scheduled
 
 
-def main():
+def is_valid_session_file(file_path: Path) -> bool:
+    """Verify that a session file exists, is non-empty, and contains valid JSON."""
+    if not file_path.exists() or file_path.stat().st_size < 100:
+        return False
+    try:
+        with open(file_path, encoding="utf-8") as f:
+            data = json.load(f)
+            return isinstance(data, dict) and "session_type" in data
+    except Exception:
+        return False
+
+
+def main() -> int:
+    """Execute historical data download from 2022 to current season."""
     logger.info("Starting F1 Historical Data Downloader")
-    logger.info("Target: 2022 Season -> Present (Latest Race)")
-    sessions_to_fetch = ["FP1", "FP2", "FP3", "Q", "SQ", "SS", "S", "R"]
-    
-    current_year = datetime.datetime.now().year
+    logger.info("Target: 2022 Season -> Present (Completed Races)")
+
+    current_year = datetime.now().year
+    new_downloads_count = 0
+
     for year in range(2022, current_year + 1):
-        logger.info(f"Fetching schedule for {year} season...")
+        logger.info("Fetching calendar schedule for %d season...", year)
         schedule = fastf1.get_event_schedule(year)
-        
+
         for _, event in schedule.iterrows():
-            # Skip pre-season testing
-            if event['EventFormat'] == 'testing':
+            if event.get("EventFormat") == "testing":
                 continue
-                
-            round_num = event['RoundNumber']
-            gp_name = event['EventName']
-            
-            if event['EventDate'] > datetime.datetime.now():
-                logger.info(f"[COMPLETE] Reached future event: {year} {gp_name}. Historical data download complete up to today!")
-                return
-                
+
+            round_num = int(event["RoundNumber"])
+            gp_name = str(event["EventName"])
+            event_date = pd.to_datetime(event["EventDate"])
+            naive_event_date = event_date.tz_localize(None) if event_date.tzinfo else event_date
+
+            if naive_event_date > datetime.now():
+                logger.info(
+                    "Reached future event: %d Round %d: %s. Completed historical sync up to today.",
+                    year,
+                    round_num,
+                    gp_name,
+                )
+                return new_downloads_count
+
             scheduled_sessions = get_scheduled_sessions(event)
             if not scheduled_sessions:
-                scheduled_sessions = ["FP1", "FP2", "FP3", "Q", "SQ", "SS", "S", "R"]
-                
+                scheduled_sessions = ["FP1", "FP2", "FP3", "Q", "R"]
+
             gp_folder = get_gp_folder_name(round_num, gp_name)
-            gp_path = Path(DATA_DIR) / str(year) / gp_folder
-            
-            sessions_to_fetch = []
+            gp_path = SEASONS_DIR / str(year) / gp_folder
+
+            sessions_to_fetch: list[str] = []
             for session in scheduled_sessions:
                 file_path = gp_path / FILENAME_MAP.get(session, f"{session.lower()}.json")
-                if not file_path.exists() or file_path.stat().st_size < 100:
+                if not is_valid_session_file(file_path):
                     sessions_to_fetch.append(session)
-                    
+
             if not sessions_to_fetch:
-                logger.info(f"[SKIP] Skipping {year} Round {round_num}: {gp_name} (all {len(scheduled_sessions)} sessions already downloaded)")
                 continue
-                
-            logger.info(f"Downloading {year} Round {round_num}: {gp_name} (fetching: {', '.join(sessions_to_fetch)})...")
-            
-            fetch_gp(year, round_num, sessions_to_fetch)
-            
-            time.sleep(2)
+
+            logger.info(
+                "Downloading %d Round %d: %s (Sessions: %s)...", year, round_num, gp_name, ", ".join(sessions_to_fetch)
+            )
+            results = fetch_gp(year, round_num, sessions_to_fetch)
+            success_count = sum(1 for v in results.values() if v)
+            new_downloads_count += success_count
+            time.sleep(1.5)
+
+    logger.info("Historical download complete. Ingested %d new sessions.", new_downloads_count)
+    return new_downloads_count
+
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n\nDownload interrupted. Exiting...")
+        logger.info("Download interrupted by user.")
         sys.exit(0)
