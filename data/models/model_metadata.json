@@ -1,5 +1,5 @@
 {
-  "trained_at": "2026-11-14T12:48:39.619883+00:00",
+  "trained_at": "2026-11-14T14:41:32.410102+00:00",
   "model_type": "RandomForestRegressor",
   "feature_names": [
     "grid_norm",
@@ -54,19 +54,19 @@
     },
     "test": {
       "seasons": "2026",
-      "samples": 348,
+      "samples": 223,
       "metrics": {
-        "r2": 0.703043,
-        "mae": 2.209522,
-        "rmse": 2.841,
-        "baseline_grid_mae": 2.342479,
-        "points_acc": 0.813218,
-        "points_f1": 0.836272,
-        "podium_acc": 0.885057,
-        "podium_f1": 0.642857,
-        "baseline_podium_acc": 0.827586
+        "r2": 0.710178,
+        "mae": 2.158385,
+        "rmse": 2.780214,
+        "baseline_grid_mae": 2.135561,
+        "points_acc": 0.807175,
+        "points_f1": 0.831373,
+        "podium_acc": 0.883408,
+        "podium_f1": 0.628571,
+        "baseline_podium_acc": 0.825112
       }
     },
-    "total_samples": 1932
+    "total_samples": 1807
   }
 }
