@@ -1,11 +1,16 @@
 """Tests for data loading, grid resolution, and feature engineering."""
 
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
+import requests
+from fastf1.exceptions import RateLimitExceededError
 
+from scripts.download_historical_data import handle_rate_limit
 from scripts.train_historical_model import extract_classified_race_results
-from src.data_fetcher import filter_flying_laps
+from src.data_fetcher import fetch_session, filter_flying_laps
 from src.data_loader import (
     aggregate_practice_pace,
     build_weekend_features,
@@ -311,4 +316,51 @@ def test_build_weekend_features_enriched_columns() -> None:
     assert ver_row["constructor_form"] == 0.10
     # Drivers absent from rolling history fall back to normalized grid position
     assert ham_row["driver_form"] == 1.0
+
+
+def test_handle_rate_limit_fails_fast_on_hourly_quota() -> None:
+    """Hourly FastF1 quotas (calls/h) should fail immediately without backoff sleeps."""
+    attempts = 0
+
+    def _quota_fn() -> None:
+        nonlocal attempts
+        attempts += 1
+        raise RateLimitExceededError("any API: 500 calls/h")
+
+    with patch("scripts.download_historical_data.time.sleep") as mock_sleep, pytest.raises(RateLimitExceededError):
+        handle_rate_limit(_quota_fn, max_retries=4)
+
+    assert attempts == 1
+    mock_sleep.assert_not_called()
+
+
+def test_handle_rate_limit_retries_transient_request_error() -> None:
+    """Transient HTTP errors should still retry with backoff before succeeding."""
+    attempts = 0
+
+    def _flaky_fn() -> str:
+        nonlocal attempts
+        attempts += 1
+        if attempts < 2:
+            raise requests.exceptions.ConnectionError("temporary reset")
+        return "ok"
+
+    with patch("scripts.download_historical_data.time.sleep") as mock_sleep:
+        assert handle_rate_limit(_flaky_fn, max_retries=4) == "ok"
+
+    assert attempts == 2
+    mock_sleep.assert_called_once_with(30)
+
+
+def test_fetch_session_propagates_rate_limit_exceeded() -> None:
+    """fetch_session must re-raise RateLimitExceededError so callers can stop cleanly."""
+    mock_session = MagicMock()
+    mock_session.load.side_effect = RateLimitExceededError("any API: 500 calls/h")
+
+    with (
+        patch("src.data_fetcher.fastf1.get_session", return_value=mock_session),
+        pytest.raises(RateLimitExceededError),
+    ):
+        fetch_session(2026, 20, "FP3")
+
 

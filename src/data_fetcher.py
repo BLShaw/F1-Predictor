@@ -12,6 +12,7 @@ from typing import Any
 
 import fastf1
 import pandas as pd
+from fastf1.exceptions import RateLimitExceededError
 
 from src.config import CACHE_DIR, SEASONS_DIR
 
@@ -218,6 +219,8 @@ def fetch_session(year: int, gp: str | int, session_type: str) -> tuple[dict[str
         logger.info("Successfully fetched %s for %s %d", session_type, gp_name, year)
         return session_data, round_num, gp_name
 
+    except RateLimitExceededError:
+        raise
     except Exception as exc:
         logger.error("Error fetching %s for %s %d: %s", session_type, gp, year, exc)
         return None

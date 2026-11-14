@@ -33,7 +33,6 @@ RETRYABLE_ERROR_TERMS: tuple[str, ...] = (
     "rate limit",
     "too many requests",
     "quota",
-    "500 calls",
     "502",
     "503",
     "504",
@@ -44,22 +43,28 @@ RETRYABLE_ERROR_TERMS: tuple[str, ...] = (
 )
 
 
-def handle_rate_limit(func: Any, *args: Any, max_retries: int = 4, **kwargs: Any) -> Any:
-    """Execute FastF1 API call with exponential backoff on HTTP 429, rate limits, and transient errors."""
+def _is_hourly_rate_limit(exc: BaseException) -> bool:
+    """Return True if exc represents FastF1's client-side hourly call quota."""
     rate_limit_exc = getattr(fastf1.exceptions, "RateLimitExceededError", None) or getattr(
         fastf1, "RateLimitExceededError", None
     )
-    retryable_types: tuple[type[BaseException], ...] = (
-        (rate_limit_exc, requests.exceptions.RequestException)
-        if isinstance(rate_limit_exc, type)
-        else (requests.exceptions.RequestException,)
-    )
+    return (isinstance(rate_limit_exc, type) and isinstance(exc, rate_limit_exc)) or "calls/h" in str(exc).lower()
+
+
+def handle_rate_limit(func: Any, *args: Any, max_retries: int = 4, **kwargs: Any) -> Any:
+    """Execute FastF1 API call with backoff on transient errors, failing fast on hourly quotas."""
     for attempt in range(1, max_retries + 1):
         try:
             return func(*args, **kwargs)
         except Exception as exc:
+            if _is_hourly_rate_limit(exc):
+                # Hourly sliding-window limits (e.g. 500 calls/h) cannot clear within seconds,
+                # and FastF1 records every retry attempt into its sliding window.
+                raise
             msg = str(exc).lower()
-            is_retryable = isinstance(exc, retryable_types) or any(term in msg for term in RETRYABLE_ERROR_TERMS)
+            is_retryable = isinstance(exc, requests.exceptions.RequestException) or any(
+                term in msg for term in RETRYABLE_ERROR_TERMS
+            )
             if is_retryable and attempt < max_retries:
                 backoff_seconds = 30 * (2 ** (attempt - 1))
                 logger.warning(
@@ -319,12 +324,22 @@ def main(argv: list[str] | None = None) -> int:
     logger.info("Target Seasons: %s", target_years)
 
     new_downloads_count = 0
+    rate_limited = False
 
     for year in target_years:
+        if rate_limited:
+            break
         logger.info("Fetching calendar schedule for %d season...", year)
         try:
             schedule = fastf1.get_event_schedule(year)
         except Exception as exc:
+            if _is_hourly_rate_limit(exc):
+                logger.warning(
+                    "FastF1 hourly rate limit reached (%s). Stopping ingestion early with %d newly saved sessions.",
+                    exc,
+                    new_downloads_count,
+                )
+                break
             logger.error("Failed to fetch schedule for %d season: %s", year, exc)
             continue
 
@@ -374,7 +389,18 @@ def main(argv: list[str] | None = None) -> int:
             logger.info(
                 "Downloading %d Round %d: %s (Sessions: %s)...", year, round_num, gp_name, ", ".join(sessions_to_fetch)
             )
-            results = fetch_gp(year, round_num, sessions_to_fetch)
+            try:
+                results = fetch_gp(year, round_num, sessions_to_fetch)
+            except Exception as exc:
+                if _is_hourly_rate_limit(exc):
+                    logger.warning(
+                        "FastF1 hourly rate limit reached (%s). Stopping ingestion early with %d newly saved sessions.",
+                        exc,
+                        new_downloads_count,
+                    )
+                    rate_limited = True
+                    break
+                raise
             success_count = sum(1 for v in results.values() if v)
             new_downloads_count += success_count
             time.sleep(1.5)
