@@ -63,6 +63,9 @@ jobs:
 
     - name: Download Latest Race Data
       shell: bash
+      env:
+        F1_USERNAME: ${{ secrets.F1_USERNAME }}
+        F1_PASSWORD: ${{ secrets.F1_PASSWORD }}
       run: |
         ARGS=()
         if [ -n "${{ inputs.years }}" ]; then

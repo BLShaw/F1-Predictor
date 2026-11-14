@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import fastf1
+import fastf1.exceptions
 import pandas as pd
 import requests
 
@@ -45,7 +46,9 @@ RETRYABLE_ERROR_TERMS: tuple[str, ...] = (
 
 def handle_rate_limit(func: Any, *args: Any, max_retries: int = 4, **kwargs: Any) -> Any:
     """Execute FastF1 API call with exponential backoff on HTTP 429, rate limits, and transient errors."""
-    rate_limit_exc = getattr(fastf1, "RateLimitExceededError", None)
+    rate_limit_exc = getattr(fastf1.exceptions, "RateLimitExceededError", None) or getattr(
+        fastf1, "RateLimitExceededError", None
+    )
     retryable_types: tuple[type[BaseException], ...] = (
         (rate_limit_exc, requests.exceptions.RequestException)
         if isinstance(rate_limit_exc, type)
