@@ -4,6 +4,8 @@ from typing import Any
 
 import pandas as pd
 
+from scripts.train_historical_model import extract_classified_race_results
+from src.data_fetcher import filter_flying_laps
 from src.data_loader import (
     aggregate_practice_pace,
     build_weekend_features,
@@ -243,4 +245,70 @@ def test_get_drivers_from_session_malformed_or_corrupt() -> None:
     df = get_drivers_from_session(valid_data)
     assert len(df) == 1
     assert df.iloc[0]["driver"] == "VER"
+
+
+def test_build_weekend_features_is_sprint_flag() -> None:
+    """Verify build_weekend_features sets is_sprint=1 on sprint weekends and 0 on standard weekends."""
+    gp_std = _make_dummy_gp_data(year=2024, has_sprint=False, include_practice=True)
+    features_std = build_weekend_features(gp_std)
+    assert (features_std["is_sprint"] == 0).all()
+
+    gp_sprint = _make_dummy_gp_data(year=2024, has_sprint=True, include_practice=True)
+    features_sprint = build_weekend_features(gp_sprint)
+    assert (features_sprint["is_sprint"] == 1).all()
+
+
+def test_filter_flying_laps_handles_none_deleted_column() -> None:
+    """Verify filter_flying_laps handles object Deleted values (None/True/False) without TypeError."""
+    laps = pd.DataFrame(
+        {
+            "LapTime": pd.to_timedelta([80.1, 81.5, 82.0], unit="s"),
+            "Deleted": pd.Series([True, None, False], dtype=object),
+            "IsAccurate": pd.Series([True, True, None], dtype=object),
+        }
+    )
+    valid = filter_flying_laps(laps)
+    assert valid == [81.5]
+
+
+def test_extract_classified_race_results_excludes_retired_top16() -> None:
+    """Verify retired drivers finishing inside top 16 are excluded from classified training labels."""
+    race_session = {
+        "results": [
+            {"driver": "VER", "position": 1, "status": "Finished"},
+            {"driver": "NOR", "position": 2, "status": "+1 Lap"},
+            {"driver": "ALB", "position": 3, "status": "Lapped"},
+            {"driver": "HAM", "position": 14, "status": "Retired"},
+            {"driver": "LEC", "position": 15, "status": "Accident"},
+            {"driver": "SAI", "position": 16, "status": "Engine"},
+        ]
+    }
+    classified = extract_classified_race_results(race_session)
+    assert classified == {"VER": 1, "NOR": 2, "ALB": 3}
+
+
+def test_build_weekend_features_enriched_columns() -> None:
+    """Verify quali_gap_norm, circuit metadata, and pre-race rolling form columns are populated."""
+    gp_data = _make_dummy_gp_data(year=2024, has_sprint=False, include_practice=True)
+    gp_data["sessions"]["qualifying"]["track"] = "Monte Carlo"
+    gp_data["sessions"]["qualifying"]["gp_name"] = "Monaco Grand Prix"
+
+    rolling = ({"VER": 0.05, "NOR": 0.15}, {"Red Bull Racing": 0.10, "McLaren": 0.20})
+    features = build_weekend_features(gp_data, rolling_form=rolling)
+
+    for col in ["quali_gap_norm", "overtaking_difficulty", "is_street_circuit", "driver_form", "constructor_form"]:
+        assert col in features.columns
+        assert features[col].notna().all()
+
+    assert (features["is_street_circuit"] == 1).all()
+    assert (features["overtaking_difficulty"] == 1.0).all()
+
+    ver_row = features[features["driver"] == "VER"].iloc[0]
+    ham_row = features[features["driver"] == "HAM"].iloc[0]
+    assert ver_row["quali_gap_norm"] == 0.0
+    assert ham_row["quali_gap_norm"] == 1.0
+    assert ver_row["driver_form"] == 0.05
+    assert ver_row["constructor_form"] == 0.10
+    # Drivers absent from rolling history fall back to normalized grid position
+    assert ham_row["driver_form"] == 1.0
 

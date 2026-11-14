@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from src.config import DEFAULT_TEAM_COLOR, TEAM_COLORS, get_team_for_driver
+from src.config import DEFAULT_TEAM_COLOR, TEAM_COLORS, get_team_for_driver, get_track_characteristics
 from src.utils.helpers import format_gap, format_lap_time, get_team_color
 
 
@@ -89,3 +89,30 @@ def test_get_team_for_driver() -> None:
     assert get_team_for_driver("UNKNOWN") == ""
     assert get_team_for_driver("") == ""
     assert get_team_for_driver(None) == ""
+
+
+def test_get_track_characteristics() -> None:
+    """Verify get_track_characteristics resolves canonical names, FastF1 aliases, and circuit flags."""
+    monaco = get_track_characteristics("Monte Carlo", "Monaco Grand Prix")
+    assert monaco["track_key"] == "Monaco"
+    assert monaco["is_street_circuit"] == 1
+    assert monaco["overtaking_difficulty_score"] == 1.0
+
+    bahrain = get_track_characteristics("Sakhir", "Bahrain Grand Prix")
+    assert bahrain["track_key"] == "Bahrain"
+    assert bahrain["is_street_circuit"] == 0
+    assert bahrain["overtaking_difficulty_score"] == 0.25
+
+    singapore = get_track_characteristics("Marina Bay")
+    assert singapore["track_key"] == "Singapore"
+    assert singapore["is_street_circuit"] == 1
+    assert singapore["overtaking_difficulty_score"] == 1.0
+
+    paul_ricard = get_track_characteristics("Le Castellet")
+    assert paul_ricard["track_key"] == "Le Castellet"
+    assert paul_ricard["is_street_circuit"] == 0
+
+    madrid = get_track_characteristics("Madrid", "Spanish Grand Prix")
+    assert madrid["track_key"] == "Madrid"
+    assert madrid["is_street_circuit"] == 1
+    assert madrid["overtaking_difficulty_score"] == 0.75

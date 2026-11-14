@@ -5,6 +5,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+from src.config import get_track_characteristics
 from src.data_loader import get_drivers_from_session
 from src.ui.components import render_empty_state, render_metric_grid, render_section_header
 from src.utils.helpers import format_lap_time
@@ -60,6 +61,47 @@ def render_overview_tab(gp_data: dict[str, Any], selected_gp: dict[str, Any]) ->
         },
     ]
     render_metric_grid(metrics)
+
+    track_name = ""
+    gp_name = str(selected_gp.get("name", "") or gp_data.get("gp_folder", ""))
+    for s in sessions.values():
+        if isinstance(s, dict):
+            if not track_name and s.get("track"):
+                track_name = str(s["track"])
+            if not gp_name and s.get("gp_name"):
+                gp_name = str(s["gp_name"])
+
+    track_info = get_track_characteristics(track_name=track_name, gp_name=gp_name)
+    circuit_type = str(track_info.get("type", "permanent")).strip() or "permanent"
+    circuit_metrics = [
+        {
+            "label": "Circuit Length",
+            "value": f"{float(track_info['length_km']):.3f} km" if "length_km" in track_info else "—",
+            "delta": f"{circuit_type.title()} Circuit",
+        },
+        {
+            "label": "Corner Count",
+            "value": f"{int(track_info['corners'])} Turns" if "corners" in track_info else "—",
+            "delta": f"{int(track_info['drs_zones'])} DRS Zones" if "drs_zones" in track_info else None,
+        },
+        {
+            "label": "Downforce Level",
+            "value": str(track_info.get("downforce", "—")).title(),
+        },
+        {
+            "label": "Overtaking Difficulty",
+            "value": str(track_info.get("overtaking_difficulty", "—")).title(),
+        },
+        {
+            "label": "Tire Wear",
+            "value": str(track_info.get("tire_wear", "—")).title(),
+        },
+    ]
+    render_section_header(
+        "CIRCUIT TECHNICAL PROFILE",
+        "Track geometry, aerodynamic load, and tire degradation profile",
+    )
+    render_metric_grid(circuit_metrics)
 
     render_section_header("WEEKEND SESSION SUMMARY", "Pacesetters and best recorded lap times by session")
 

@@ -5,6 +5,21 @@ on:
     # Run every Monday at 12:00 UTC (following race weekends)
     - cron: '0 12 * * 1'
   workflow_dispatch:
+    inputs:
+      years:
+        description: 'Optional space-separated seasons to sync (e.g., "2025 2026")'
+        required: false
+        default: ''
+        type: string
+      force:
+        description: 'Force re-download of existing session files'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   update-model:
@@ -23,36 +38,61 @@ jobs:
         python-version: '3.12'
         cache: 'pip'
 
+    - name: Cache FastF1 Telemetry & Historical Seasons
+      uses: actions/cache@v4
+      with:
+        path: |
+          f1_cache
+          data/seasons
+        key: ${{ runner.os }}-fastf1-seasons-${{ github.run_id }}
+        restore-keys: |
+          ${{ runner.os }}-fastf1-seasons-
+          ${{ runner.os }}-fastf1-
+
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install -e ".[dev]"
 
     - name: Run Quality Verification
       run: |
         ruff check .
-        pytest -v
+        bandit -r src scripts app.py -ll -ii
+        pytest -v --tb=short
 
     - name: Download Latest Race Data
-      run: python scripts/download_historical_data.py
+      shell: bash
+      run: |
+        ARGS=()
+        if [ -n "${{ inputs.years }}" ]; then
+          read -r -a YEAR_ARGS <<< "${{ inputs.years }}"
+          ARGS+=(--years "${YEAR_ARGS[@]}")
+        fi
+        if [ "${{ inputs.force }}" = "true" ]; then
+          ARGS+=(--force)
+        fi
+        python scripts/download_historical_data.py "${ARGS[@]}"
+        python scripts/download_historical_data.py --backfill-consistency
 
     - name: Retrain Historical Model
       run: python scripts/train_historical_model.py
 
     - name: Validate Model and Pipeline
-      run: pytest -v
+      run: pytest -v --tb=short
 
     - name: Commit and Push Changes
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-        git add data/seasons/
         git add data/models/f1_historical_model.joblib
+        git add data/models/model_metadata.json
 
         if git diff --staged --quiet; then
           echo "No new race data or model changes detected."
         else
           git commit -m "chore(model): retrain historical model with latest race data"
+          git pull --rebase origin "${{ github.ref_name }}"
           git push
         fi

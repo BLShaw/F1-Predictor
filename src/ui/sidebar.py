@@ -107,6 +107,7 @@ def render_sidebar() -> tuple[int | None, dict[str, Any] | None]:
                                     logger.warning("Error downloading %s: %s", gp_name, exc)
 
                             progress_bar.progress(1.0, text="Complete!")
+                            st.cache_data.clear()
                             st.success(f"Downloaded {success_count} sessions across {total_gps} Grand Prix events.")
                             st.rerun()
                         except Exception as exc:
@@ -162,6 +163,7 @@ def render_sidebar() -> tuple[int | None, dict[str, Any] | None]:
                             try:
                                 results = fetch_gp(gp_year, round_num, gp_sessions)
                                 success_count = sum(1 for v in results.values() if v)
+                                st.cache_data.clear()
                                 st.success(f"Downloaded {success_count}/{len(gp_sessions)} sessions.")
                                 st.rerun()
                             except Exception as exc:
@@ -205,6 +207,7 @@ def render_sidebar() -> tuple[int | None, dict[str, Any] | None]:
                                 if result:
                                     s_data, r_num, name = result
                                     save_session_json(s_data, session_year, r_num, name, session_type)
+                                    st.cache_data.clear()
                                     st.success(f"Successfully downloaded {session_type} for {name}.")
                                     st.rerun()
                                 else:
@@ -252,6 +255,7 @@ def render_sidebar() -> tuple[int | None, dict[str, Any] | None]:
                         try:
                             results = fetch_gp(selected_season, selected_gp["round"])
                             success_count = sum(1 for v in results.values() if v)
+                            st.cache_data.clear()
                             st.success(f"{success_count} sessions updated.")
                             st.rerun()
                         except Exception as exc:
@@ -262,6 +266,7 @@ def render_sidebar() -> tuple[int | None, dict[str, Any] | None]:
         with col2:
             if st.button("CLEAR CACHE", width="stretch"):
                 success, msg = clear_fastf1_cache()
+                st.cache_data.clear()
                 if success:
                     st.success(msg)
                 else:
@@ -310,6 +315,7 @@ def render_sidebar() -> tuple[int | None, dict[str, Any] | None]:
                                         if res:
                                             s_data, r_num, gp_name = res
                                             save_session_json(s_data, selected_season, r_num, gp_name, session_code)
+                                            st.cache_data.clear()
                                             st.success(f"{disp_name} downloaded.")
                                             st.rerun()
                                         else:

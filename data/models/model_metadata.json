@@ -1,0 +1,72 @@
+{
+  "trained_at": "2026-11-14T12:48:39.619883+00:00",
+  "model_type": "RandomForestRegressor",
+  "feature_names": [
+    "grid_norm",
+    "quali_gap_norm",
+    "pace_norm",
+    "pace_consistency",
+    "driver_form",
+    "constructor_form",
+    "overtaking_difficulty",
+    "is_street_circuit",
+    "has_practice_data",
+    "is_sprint"
+  ],
+  "hyperparameters": {
+    "n_estimators": 300,
+    "max_depth": 6,
+    "min_samples_split": 8,
+    "min_samples_leaf": 4,
+    "max_features": 0.8,
+    "random_state": 42
+  },
+  "partitions": {
+    "train": {
+      "seasons": "2022-2024",
+      "samples": 1165,
+      "metrics": {
+        "r2": 0.788422,
+        "mae": 1.810112,
+        "rmse": 2.341149,
+        "baseline_grid_mae": 2.78412,
+        "points_acc": 0.874678,
+        "points_f1": 0.88855,
+        "podium_acc": 0.909871,
+        "podium_f1": 0.709141,
+        "baseline_podium_acc": 0.824893
+      }
+    },
+    "validation": {
+      "seasons": "2025",
+      "samples": 419,
+      "metrics": {
+        "r2": 0.662178,
+        "mae": 2.301649,
+        "rmse": 3.006624,
+        "baseline_grid_mae": 2.800716,
+        "points_acc": 0.797136,
+        "points_f1": 0.814815,
+        "podium_acc": 0.914081,
+        "podium_f1": 0.704918,
+        "baseline_podium_acc": 0.828162
+      }
+    },
+    "test": {
+      "seasons": "2026",
+      "samples": 348,
+      "metrics": {
+        "r2": 0.703043,
+        "mae": 2.209522,
+        "rmse": 2.841,
+        "baseline_grid_mae": 2.342479,
+        "points_acc": 0.813218,
+        "points_f1": 0.836272,
+        "podium_acc": 0.885057,
+        "podium_f1": 0.642857,
+        "baseline_podium_acc": 0.827586
+      }
+    },
+    "total_samples": 1932
+  }
+}

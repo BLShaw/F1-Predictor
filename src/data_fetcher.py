@@ -18,7 +18,11 @@ from src.config import CACHE_DIR, SEASONS_DIR
 logger = logging.getLogger(__name__)
 
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
-fastf1.Cache.enable_cache(str(CACHE_DIR))
+if hasattr(fastf1.Cache, "configure"):
+    fastf1.Cache.configure(cache_dir=str(CACHE_DIR))
+else:
+    fastf1.Cache.enable_cache(str(CACHE_DIR))
+logging.getLogger("fastf1").propagate = False
 
 DATA_DIR: Path = SEASONS_DIR
 
@@ -116,9 +120,17 @@ def filter_flying_laps(driver_laps: pd.DataFrame) -> list[float]:
     except Exception as exc:
         logger.debug("FastF1 quicklap filtering fallback: %s", exc)
 
-    # Exclude deleted track-limit laps when IsAccurate flag is available
+    # Exclude deleted track-limit laps safely (Deleted may contain None/NaN)
+    if "Deleted" in candidate_laps.columns:
+        deleted_mask = candidate_laps["Deleted"].astype("boolean").fillna(False).astype(bool)
+        not_deleted = candidate_laps[~deleted_mask]
+        if not not_deleted.empty:
+            candidate_laps = not_deleted
+
+    # Exclude inaccurate laps when IsAccurate flag is available
     if "IsAccurate" in candidate_laps.columns:
-        accurate = candidate_laps[candidate_laps["IsAccurate"]]
+        accurate_mask = candidate_laps["IsAccurate"].astype("boolean").fillna(False).astype(bool)
+        accurate = candidate_laps[accurate_mask]
         if not accurate.empty:
             candidate_laps = accurate
 
@@ -159,7 +171,7 @@ def fetch_session(year: int, gp: str | int, session_type: str) -> tuple[dict[str
     try:
         logger.info("Fetching %s for %s %d...", session_type, gp, year)
         session = fastf1.get_session(year, gp, session_type)
-        session.load(telemetry=False, messages=False)
+        session.load(telemetry=False, messages=True)
 
         event = session.event
         round_num = int(event["RoundNumber"])

@@ -179,8 +179,51 @@ def render_model_specification(
     dnf_rate: float,
     train_seasons: str = "2022-2024",
     test_season: str = "2026",
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     """Render the dual-card technical specification for ML and Monte Carlo engines."""
+    meta = metadata if isinstance(metadata, dict) else {}
+    hp = meta.get("hyperparameters", {}) if isinstance(meta.get("hyperparameters"), dict) else {}
+    parts = meta.get("partitions", {}) if isinstance(meta.get("partitions"), dict) else {}
+
+    train_part = parts.get("train", {}) if isinstance(parts.get("train"), dict) else {}
+    val_part = parts.get("validation", {}) if isinstance(parts.get("validation"), dict) else {}
+    test_part = parts.get("test", {}) if isinstance(parts.get("test"), dict) else {}
+
+    val_metrics = val_part.get("metrics", {}) if isinstance(val_part.get("metrics"), dict) else {}
+    test_metrics = test_part.get("metrics", {}) if isinstance(test_part.get("metrics"), dict) else {}
+
+    resolved_model_type = str(meta.get("model_type") or model_type)
+    n_estimators = int(hp.get("n_estimators", 300))
+    max_depth = hp.get("max_depth", 6)
+    min_split = hp.get("min_samples_split", 8)
+    min_leaf = hp.get("min_samples_leaf", 4)
+    max_features = hp.get("max_features", 0.8)
+
+    resolved_train_seasons = str(train_part.get("seasons") or train_seasons)
+    resolved_val_season = str(val_part.get("seasons") or "2025")
+    resolved_test_season = str(test_part.get("seasons") or test_season)
+
+    train_samples = int(train_part.get("samples", 1165))
+    val_samples = int(val_part.get("samples", 419))
+    test_samples = int(test_part.get("samples", 348))
+
+    val_mae = val_metrics.get("mae")
+    val_r2 = val_metrics.get("r2")
+    val_summary = (
+        f"Temporal Out-of-Time ({resolved_val_season} Val: {val_samples:,} samples | MAE {float(val_mae):.2f}, R² {float(val_r2):.3f})"
+        if val_mae is not None and val_r2 is not None
+        else f"Temporal Out-of-Time ({resolved_val_season} Val: {val_samples:,} samples)"
+    )
+
+    test_mae = test_metrics.get("mae")
+    test_r2 = test_metrics.get("r2")
+    test_summary = (
+        f"{resolved_test_season} ({test_samples:,} samples | MAE {float(test_mae):.2f}, R² {float(test_r2):.3f})"
+        if test_mae is not None and test_r2 is not None
+        else f"{resolved_test_season} ({test_samples:,} samples)"
+    )
+
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(
@@ -188,13 +231,13 @@ def render_model_specification(
             <div class="f1-spec-card">
                 <div class="spec-header">PREDICTION REGRESSOR</div>
                 <table class="spec-table">
-                    <tr><td>Architecture</td><td>{model_type}</td></tr>
-                    <tr><td>Estimators</td><td>300 Trees</td></tr>
-                    <tr><td>Max Depth</td><td>5 Levels</td></tr>
-                    <tr><td>Min Split Samples</td><td>8</td></tr>
-                    <tr><td>Validation Split</td><td>Temporal Out-of-Time</td></tr>
-                    <tr><td>Training Set</td><td>{train_seasons} (1,187 samples)</td></tr>
-                    <tr><td>Test Set</td><td>{test_season} (227 samples)</td></tr>
+                    <tr><td>Architecture</td><td>{resolved_model_type}</td></tr>
+                    <tr><td>Estimators</td><td>{n_estimators} Trees</td></tr>
+                    <tr><td>Max Depth</td><td>{max_depth} Levels (Max Features: {max_features})</td></tr>
+                    <tr><td>Min Split Samples</td><td>{min_split} (Leaf Min: {min_leaf})</td></tr>
+                    <tr><td>Validation Split</td><td>{val_summary}</td></tr>
+                    <tr><td>Training Set</td><td>{resolved_train_seasons} ({train_samples:,} samples)</td></tr>
+                    <tr><td>Test Set</td><td>{test_summary}</td></tr>
                 </table>
             </div>
             """,
@@ -207,9 +250,9 @@ def render_model_specification(
             <div class="f1-spec-card">
                 <div class="spec-header">MONTE CARLO SIMULATION</div>
                 <table class="spec-table">
-                    <tr><td>Iterations</td><td>{simulations:,} Runs</td></tr>
-                    <tr><td>Baseline DNF Rate</td><td>{dnf_rate * 100:.1f}%</td></tr>
-                    <tr><td>Stochastic Noise</td><td>Normal(0, 1.4)</td></tr>
+                    <tr><td>Iterations</td><td>{simulations:,} Vectorized Runs</td></tr>
+                    <tr><td>Baseline DNF Rate</td><td>{dnf_rate * 100:.1f}% (Constructor Calibrated)</td></tr>
+                    <tr><td>Stochastic Noise</td><td>Context-Calibrated (Circuit &amp; Weather)</td></tr>
                     <tr><td>Points Allocation</td><td>Classified Finishers Only</td></tr>
                     <tr><td>DNF Rule</td><td>Withheld from Top-10 Points</td></tr>
                     <tr><td>Explainability</td><td>TreeSHAP Global & Local</td></tr>

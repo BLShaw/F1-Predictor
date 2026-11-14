@@ -41,6 +41,13 @@ Icon?
 # Telemetry Cache
 f1_cache/
 
+# Historical Season Session Data (populated dynamically / cached in CI)
+data/seasons/
+
+# Temporary Atomic Artifacts
+*.tmp.joblib
+*.tmp.json
+
 # Environment Variables & Secrets
 .env
 .streamlit/secrets.toml

@@ -3,6 +3,7 @@
 Framework-agnostic functions to load and transform Grand Prix session data from disk.
 """
 
+import contextlib
 import json
 import logging
 from pathlib import Path
@@ -10,7 +11,7 @@ from typing import Any
 
 import pandas as pd
 
-from src.config import SEASONS_DIR, get_team_for_driver
+from src.config import SEASONS_DIR, get_team_for_driver, get_track_characteristics
 
 logger = logging.getLogger(__name__)
 
@@ -360,7 +361,214 @@ def aggregate_practice_pace(gp_data: dict[str, Any]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def build_weekend_features(gp_data: dict[str, Any]) -> pd.DataFrame:
+def _extract_classified_finishes(race_session: dict[str, Any] | None) -> dict[str, int]:
+    """Extract classified finishing positions from a race session dictionary."""
+    if not race_session or not isinstance(race_session, dict):
+        return {}
+
+    results = race_session.get("results")
+    if not isinstance(results, list):
+        return {}
+
+    classified: dict[str, int] = {}
+    for entry in results:
+        driver = entry.get("driver")
+        pos = entry.get("position")
+        status = str(entry.get("status", "")).strip()
+        if not driver or pos is None:
+            continue
+        try:
+            pos_int = int(float(pos))
+        except (ValueError, TypeError):
+            continue
+
+        if status == "Finished" or status.startswith("+") or "Lap" in status:
+            classified[str(driver)] = pos_int
+    return classified
+
+
+def compute_rolling_form(
+    target_year: int | None = None,
+    target_round: int | None = None,
+    seasons_path: Path = SEASONS_DIR,
+) -> tuple[dict[str, float], dict[str, float]]:
+    """Compute pre-race EWMA form for drivers and constructors strictly prior to target event."""
+    if not seasons_path.exists():
+        return {}, {}
+
+    driver_hist: dict[str, list[float]] = {}
+    team_hist: dict[str, list[float]] = {}
+
+    season_dirs = sorted(
+        (d for d in seasons_path.iterdir() if d.is_dir() and d.name.isdigit()),
+        key=lambda d: int(d.name),
+    )
+
+    for year_dir in season_dirs:
+        season_year = int(year_dir.name)
+        if target_year is not None and season_year > target_year:
+            continue
+
+        gp_entries: list[tuple[int, Path]] = []
+        for gp_dir in year_dir.iterdir():
+            if not gp_dir.is_dir() or gp_dir.name.startswith("."):
+                continue
+            prefix = gp_dir.name.split("_", 1)[0]
+            if prefix.isdigit():
+                gp_entries.append((int(prefix), gp_dir))
+
+        for round_num, gp_dir in sorted(gp_entries, key=lambda x: x[0]):
+            if (
+                target_year is not None
+                and season_year == target_year
+                and target_round is not None
+                and round_num >= target_round
+            ):
+                continue
+
+            race_session = load_session(season_year, gp_dir.name, "race", seasons_path)
+            if not race_session:
+                continue
+
+            classified = _extract_classified_finishes(race_session)
+            if not classified:
+                continue
+
+            raw_results = race_session.get("results", [])
+            n_cars = max(len(raw_results), max(classified.values(), default=1), 1)
+            driver_teams = {
+                str(entry.get("driver", "")): str(entry.get("team", "")).strip()
+                for entry in raw_results
+                if entry.get("driver")
+            }
+
+            for drv, finish_pos in classified.items():
+                norm_finish = (finish_pos - 1.0) / max(n_cars - 1, 1)
+                driver_hist.setdefault(drv, []).append(norm_finish)
+                team_name = driver_teams.get(drv) or get_team_for_driver(drv)
+                if team_name:
+                    team_hist.setdefault(team_name, []).append(norm_finish)
+
+    driver_form = {
+        drv: float(pd.Series(hist[-5:]).ewm(span=3).mean().iloc[-1])
+        for drv, hist in driver_hist.items()
+        if hist
+    }
+    constructor_form = {
+        tm: float(pd.Series(hist[-10:]).ewm(span=5).mean().iloc[-1])
+        for tm, hist in team_hist.items()
+        if hist
+    }
+    return driver_form, constructor_form
+
+
+def extract_qualifying_gaps(gp_data: dict[str, Any], grid_df: pd.DataFrame) -> pd.Series:
+    """Compute normalized qualifying lap time delta to pole per grid driver."""
+    n_drivers = max(len(grid_df), 1)
+    grid_norm = (pd.to_numeric(grid_df["grid"], errors="coerce").fillna(n_drivers) - 1.0) / max(n_drivers - 1, 1)
+
+    sessions = gp_data.get("sessions", {})
+    q_session = (
+        sessions.get("qualifying")
+        or sessions.get("sprint_qualifying")
+        or sessions.get("sprint_shootout")
+    )
+    if not q_session:
+        return grid_norm
+
+    q_df = get_qualifying_results(q_session)
+    q_times: dict[str, float] = {}
+    if not q_df.empty and "driver" in q_df.columns:
+        q_cols = [c for c in ["q3", "q2", "q1", "sq3", "sq2", "sq1"] if c in q_df.columns]
+        for _, row in q_df.iterrows():
+            drv = str(row["driver"])
+            vals = [float(row[c]) for c in q_cols if pd.notna(row.get(c)) and float(row[c]) > 0]
+            if vals:
+                q_times[drv] = min(vals)
+
+    raw_best = q_session.get("best_times", {})
+    if isinstance(raw_best, dict):
+        for drv, t in raw_best.items():
+            if str(drv) not in q_times and pd.notna(t) and float(t) > 0:
+                q_times[str(drv)] = float(t)
+
+    if not q_times:
+        return grid_norm
+
+    q_min = min(q_times.values())
+    q_max = max(q_times.values())
+    q_range = q_max - q_min if q_max > q_min else 1.0
+
+    gaps: list[float] = []
+    for idx, row in grid_df.iterrows():
+        drv = str(row["driver"])
+        q_time = q_times.get(drv)
+        if q_time is not None:
+            gaps.append(float(min(1.5, max(0.0, (q_time - q_min) / q_range))))
+        else:
+            gaps.append(float(grid_norm.loc[idx]))
+    return pd.Series(gaps, index=grid_df.index, dtype=float)
+
+
+def _resolve_gp_context(gp_data: dict[str, Any]) -> tuple[str, str, int | None, int | None]:
+    """Extract track name, GP name, season year, and round number from gp_data."""
+    sessions = gp_data.get("sessions", {})
+    track_name = ""
+    gp_name = str(gp_data.get("name", "") or gp_data.get("gp_folder", ""))
+    round_num: int | None = gp_data.get("round")
+
+    for key in ["race", "qualifying", "fp1", "fp2", "fp3", "sprint", "sprint_qualifying", "sprint_shootout"]:
+        session = sessions.get(key)
+        if isinstance(session, dict):
+            if not track_name and session.get("track"):
+                track_name = str(session["track"])
+            if session.get("gp_name"):
+                gp_name = str(session["gp_name"])
+            if round_num is None and session.get("round") is not None:
+                with contextlib.suppress(ValueError, TypeError):
+                    round_num = int(session["round"])
+
+    if round_num is None and gp_data.get("gp_folder"):
+        prefix = str(gp_data["gp_folder"]).split("_", 1)[0]
+        if prefix.isdigit():
+            round_num = int(prefix)
+
+    year_val = gp_data.get("year")
+    try:
+        year_int = int(year_val) if year_val is not None else None
+    except (ValueError, TypeError):
+        year_int = None
+
+    return track_name, gp_name, year_int, round_num
+
+
+def extract_weekend_rainfall(gp_data: dict[str, Any]) -> bool:
+    """Detect whether rainfall was recorded for the race or weekend sessions."""
+    sessions = gp_data.get("sessions", {})
+    if not isinstance(sessions, dict):
+        return False
+
+    race_session = sessions.get("race")
+    if isinstance(race_session, dict):
+        race_weather = race_session.get("weather")
+        if isinstance(race_weather, dict) and "rainfall" in race_weather:
+            return bool(race_weather.get("rainfall", False))
+
+    for key in ["sprint", "qualifying", "sprint_qualifying", "sprint_shootout", "fp3", "fp2", "fp1"]:
+        session = sessions.get(key)
+        if isinstance(session, dict):
+            weather = session.get("weather")
+            if isinstance(weather, dict) and bool(weather.get("rainfall", False)):
+                return True
+
+    return False
+
+
+def build_weekend_features(
+    gp_data: dict[str, Any],
+    seasons_path: Path = SEASONS_DIR,
+    rolling_form: tuple[dict[str, float], dict[str, float]] | None = None,
+) -> pd.DataFrame:
     """Build pre-race feature set anchored to starting grid using LEFT JOIN.
 
     Prevents silent driver deletion: drivers on grid without practice laps
@@ -388,7 +596,6 @@ def build_weekend_features(gp_data: dict[str, Any]) -> pd.DataFrame:
     # Circuit-relative pace imputation: 102% of slowest observed practice time
     if features["best"].notna().any():
         slowest_observed = float(features["best"].dropna().max())
-        float(features["best"].dropna().min())
         imputed_best = slowest_observed * 1.02
         features["best"] = features["best"].fillna(imputed_best)
         features["avg"] = features["avg"].fillna(imputed_best)
@@ -410,4 +617,42 @@ def build_weekend_features(gp_data: dict[str, Any]) -> pd.DataFrame:
     else:
         features["is_single_practice"] = features["is_single_practice"].astype(bool).astype(int)
 
-    return features.sort_values("grid").reset_index(drop=True)
+    sessions = gp_data.get("sessions", {})
+    is_sprint_weekend = bool(
+        sessions.get("sprint") or sessions.get("sprint_qualifying") or sessions.get("sprint_shootout")
+    )
+    features["is_sprint"] = int(is_sprint_weekend)
+
+    features = features.sort_values("grid").reset_index(drop=True)
+    n_drivers = max(len(features), 1)
+    grid_norm_series = (features["grid"].astype(float) - 1.0) / max(n_drivers - 1, 1)
+
+    features["quali_gap_norm"] = extract_qualifying_gaps(gp_data, features)
+
+    track_name, gp_name, year_int, round_num = _resolve_gp_context(gp_data)
+    track_meta = get_track_characteristics(track_name=track_name, gp_name=gp_name)
+    features["overtaking_difficulty"] = float(track_meta["overtaking_difficulty_score"])
+    features["is_street_circuit"] = int(track_meta["is_street_circuit"])
+    features["rainfall"] = int(extract_weekend_rainfall(gp_data))
+
+    if rolling_form is not None:
+        driver_form_map, team_form_map = rolling_form
+    elif year_int is not None and round_num is not None:
+        driver_form_map, team_form_map = compute_rolling_form(year_int, round_num, seasons_path)
+    else:
+        driver_form_map, team_form_map = {}, {}
+
+    driver_forms: list[float] = []
+    constructor_forms: list[float] = []
+    for idx, row in features.iterrows():
+        drv = str(row["driver"])
+        fallback_val = float(grid_norm_series.loc[idx])
+        driver_forms.append(float(driver_form_map.get(drv, fallback_val)))
+
+        team_name = str(row.get("team", "")).strip() or get_team_for_driver(drv)
+        constructor_forms.append(float(team_form_map.get(team_name, fallback_val)))
+
+    features["driver_form"] = driver_forms
+    features["constructor_form"] = constructor_forms
+
+    return features

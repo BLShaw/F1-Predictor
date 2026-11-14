@@ -95,6 +95,14 @@
         "Abu Dhabi": {
             "lat": 24.4672,
             "lon": 54.6031
+        },
+        "Le Castellet": {
+            "lat": 43.2506,
+            "lon": 5.7917
+        },
+        "Madrid": {
+            "lat": 40.4647,
+            "lon": -3.6164
         }
     },
     "TRACK_CHARACTERISTICS": {
@@ -104,7 +112,9 @@
             "turns": 15,
             "downforce": "medium",
             "pit_loss_time": 21.5,
-            "overtaking_difficulty": "low"
+            "overtaking_difficulty": "low",
+            "type": "permanent",
+            "tire_wear": "high"
         },
         "Jeddah": {
             "circuit_name": "Jeddah Corniche Circuit",
@@ -112,7 +122,9 @@
             "turns": 27,
             "downforce": "low",
             "pit_loss_time": 22.0,
-            "overtaking_difficulty": "high"
+            "overtaking_difficulty": "high",
+            "type": "street",
+            "tire_wear": "low"
         },
         "Melbourne": {
             "circuit_name": "Albert Park Circuit",
@@ -120,7 +132,9 @@
             "turns": 14,
             "downforce": "medium",
             "pit_loss_time": 20.0,
-            "overtaking_difficulty": "medium"
+            "overtaking_difficulty": "medium",
+            "type": "street",
+            "tire_wear": "medium"
         },
         "Suzuka": {
             "circuit_name": "Suzuka International Racing Course",
@@ -128,7 +142,9 @@
             "turns": 18,
             "downforce": "high",
             "pit_loss_time": 21.0,
-            "overtaking_difficulty": "high"
+            "overtaking_difficulty": "high",
+            "type": "permanent",
+            "tire_wear": "high"
         },
         "Shanghai": {
             "circuit_name": "Shanghai International Circuit",
@@ -136,7 +152,9 @@
             "turns": 16,
             "downforce": "medium",
             "pit_loss_time": 21.5,
-            "overtaking_difficulty": "low"
+            "overtaking_difficulty": "low",
+            "type": "permanent",
+            "tire_wear": "high"
         },
         "Miami": {
             "circuit_name": "Miami International Autodrome",
@@ -144,7 +162,9 @@
             "turns": 19,
             "downforce": "medium",
             "pit_loss_time": 20.5,
-            "overtaking_difficulty": "medium"
+            "overtaking_difficulty": "medium",
+            "type": "street",
+            "tire_wear": "low"
         },
         "Imola": {
             "circuit_name": "Autodromo Enzo e Dino Ferrari",
@@ -152,7 +172,9 @@
             "turns": 19,
             "downforce": "high",
             "pit_loss_time": 24.0,
-            "overtaking_difficulty": "high"
+            "overtaking_difficulty": "high",
+            "type": "permanent",
+            "tire_wear": "medium"
         },
         "Monaco": {
             "circuit_name": "Circuit de Monaco",
@@ -160,7 +182,9 @@
             "turns": 19,
             "downforce": "high",
             "pit_loss_time": 23.0,
-            "overtaking_difficulty": "very_high"
+            "overtaking_difficulty": "very_high",
+            "type": "street",
+            "tire_wear": "low"
         },
         "Montreal": {
             "circuit_name": "Circuit Gilles Villeneuve",
@@ -168,7 +192,9 @@
             "turns": 14,
             "downforce": "low",
             "pit_loss_time": 20.5,
-            "overtaking_difficulty": "medium"
+            "overtaking_difficulty": "medium",
+            "type": "street",
+            "tire_wear": "low"
         },
         "Barcelona": {
             "circuit_name": "Circuit de Barcelona-Catalunya",
@@ -176,7 +202,9 @@
             "turns": 16,
             "downforce": "high",
             "pit_loss_time": 21.0,
-            "overtaking_difficulty": "high"
+            "overtaking_difficulty": "high",
+            "type": "permanent",
+            "tire_wear": "high"
         },
         "Spielberg": {
             "circuit_name": "Red Bull Ring",
@@ -184,7 +212,9 @@
             "turns": 10,
             "downforce": "low",
             "pit_loss_time": 18.5,
-            "overtaking_difficulty": "low"
+            "overtaking_difficulty": "low",
+            "type": "permanent",
+            "tire_wear": "medium"
         },
         "Silverstone": {
             "circuit_name": "Silverstone Circuit",
@@ -192,7 +222,9 @@
             "turns": 18,
             "downforce": "high",
             "pit_loss_time": 19.0,
-            "overtaking_difficulty": "medium"
+            "overtaking_difficulty": "medium",
+            "type": "permanent",
+            "tire_wear": "high"
         },
         "Budapest": {
             "circuit_name": "Hungaroring",
@@ -200,7 +232,9 @@
             "turns": 14,
             "downforce": "high",
             "pit_loss_time": 21.5,
-            "overtaking_difficulty": "very_high"
+            "overtaking_difficulty": "very_high",
+            "type": "permanent",
+            "tire_wear": "medium"
         },
         "Spa": {
             "circuit_name": "Circuit de Spa-Francorchamps",
@@ -208,7 +242,9 @@
             "turns": 19,
             "downforce": "medium",
             "pit_loss_time": 22.0,
-            "overtaking_difficulty": "low"
+            "overtaking_difficulty": "low",
+            "type": "permanent",
+            "tire_wear": "high"
         },
         "Zandvoort": {
             "circuit_name": "Circuit Zandvoort",
@@ -216,7 +252,9 @@
             "turns": 14,
             "downforce": "high",
             "pit_loss_time": 19.0,
-            "overtaking_difficulty": "very_high"
+            "overtaking_difficulty": "very_high",
+            "type": "permanent",
+            "tire_wear": "high"
         },
         "Monza": {
             "circuit_name": "Autodromo Nazionale Monza",
@@ -224,7 +262,9 @@
             "turns": 11,
             "downforce": "low",
             "pit_loss_time": 24.0,
-            "overtaking_difficulty": "low"
+            "overtaking_difficulty": "low",
+            "type": "permanent",
+            "tire_wear": "low"
         },
         "Baku": {
             "circuit_name": "Baku City Circuit",
@@ -232,7 +272,9 @@
             "turns": 20,
             "downforce": "low",
             "pit_loss_time": 22.0,
-            "overtaking_difficulty": "medium"
+            "overtaking_difficulty": "medium",
+            "type": "street",
+            "tire_wear": "low"
         },
         "Singapore": {
             "circuit_name": "Marina Bay Street Circuit",
@@ -240,7 +282,9 @@
             "turns": 19,
             "downforce": "high",
             "pit_loss_time": 29.0,
-            "overtaking_difficulty": "very_high"
+            "overtaking_difficulty": "very_high",
+            "type": "street",
+            "tire_wear": "medium"
         },
         "Austin": {
             "circuit_name": "Circuit of The Americas",
@@ -248,7 +292,9 @@
             "turns": 20,
             "downforce": "medium",
             "pit_loss_time": 22.0,
-            "overtaking_difficulty": "medium"
+            "overtaking_difficulty": "medium",
+            "type": "permanent",
+            "tire_wear": "high"
         },
         "Mexico City": {
             "circuit_name": "Autódromo Hermanos Rodríguez",
@@ -256,7 +302,9 @@
             "turns": 17,
             "downforce": "high",
             "pit_loss_time": 20.0,
-            "overtaking_difficulty": "medium"
+            "overtaking_difficulty": "medium",
+            "type": "permanent",
+            "tire_wear": "low"
         },
         "Sao Paulo": {
             "circuit_name": "Autódromo José Carlos Pace",
@@ -264,7 +312,9 @@
             "turns": 15,
             "downforce": "high",
             "pit_loss_time": 21.0,
-            "overtaking_difficulty": "low"
+            "overtaking_difficulty": "low",
+            "type": "permanent",
+            "tire_wear": "medium"
         },
         "Las Vegas": {
             "circuit_name": "Las Vegas Street Circuit",
@@ -272,7 +322,9 @@
             "turns": 17,
             "downforce": "low",
             "pit_loss_time": 21.5,
-            "overtaking_difficulty": "medium"
+            "overtaking_difficulty": "medium",
+            "type": "street",
+            "tire_wear": "low"
         },
         "Lusail": {
             "circuit_name": "Lusail International Circuit",
@@ -280,7 +332,9 @@
             "turns": 16,
             "downforce": "medium",
             "pit_loss_time": 20.0,
-            "overtaking_difficulty": "medium"
+            "overtaking_difficulty": "medium",
+            "type": "permanent",
+            "tire_wear": "high"
         },
         "Abu Dhabi": {
             "circuit_name": "Yas Marina Circuit",
@@ -288,7 +342,29 @@
             "turns": 16,
             "downforce": "high",
             "pit_loss_time": 22.5,
-            "overtaking_difficulty": "medium"
+            "overtaking_difficulty": "medium",
+            "type": "permanent",
+            "tire_wear": "medium"
+        },
+        "Le Castellet": {
+            "circuit_name": "Circuit Paul Ricard",
+            "length_km": 5.842,
+            "turns": 15,
+            "downforce": "medium",
+            "pit_loss_time": 21.0,
+            "overtaking_difficulty": "medium",
+            "type": "permanent",
+            "tire_wear": "medium"
+        },
+        "Madrid": {
+            "circuit_name": "Madring Street Circuit",
+            "length_km": 5.474,
+            "turns": 20,
+            "downforce": "medium",
+            "pit_loss_time": 21.5,
+            "overtaking_difficulty": "high",
+            "type": "street",
+            "tire_wear": "medium"
         }
     }
 }

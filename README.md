@@ -5,7 +5,7 @@ A Formula 1 prediction engine combining Monte Carlo simulation with Machine Lear
 [![CI](https://github.com/BLShaw/f1-predictor/actions/workflows/ci.yml/badge.svg)](https://github.com/BLShaw/f1-predictor/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg)](https://www.python.org/)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
-[![Tests](https://img.shields.io/badge/tests-36%20passed-10B981.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-51%20passed-10B981.svg)](tests/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ---
@@ -16,18 +16,18 @@ A Formula 1 prediction engine combining Monte Carlo simulation with Machine Lear
 flowchart LR
     subgraph Data["1. Telemetry & Regulations"]
         A["FastF1 API Ingestion"] --> B["Clean Flying Laps\n(pick_quicklaps + IsAccurate)"]
-        B --> C["Grid-Anchored Left Join\n& 102% Pace Imputation"]
+        B --> C["10-Feature Matrix\n(Grid, Quali Gap, Practice, Form, Track)"]
     end
 
     subgraph Model["2. Machine Learning & Simulation"]
-        C --> D["Random Forest Regressor\n(Classified Finishers Only)"]
-        D --> E["Monte Carlo Engine\n(2,000 Runs + Normal(0, 1.4) Noise)"]
+        C --> D["Random Forest Regressor\n(300 Trees, Max Depth 6, Classified Only)"]
+        D --> E["Vectorized Monte Carlo Engine\n(Circuit, Wet-Weather & Team DNF Calibration)"]
         E --> F["Points Withholding Rule\n(DNFs Excluded from Top-10 Points)"]
     end
 
     subgraph Serving["3. Dashboard & Explainability"]
-        F --> G["Streamlit Mission Control\n(Overview, Practice, Quali, Race)"]
-        F --> H["TreeSHAP Explainability\n(Global & Local Marginal Waterfall)"]
+        F --> G["Streamlit Mission Control\n(Overview, Backtest & Dynamic Model Spec)"]
+        F --> H["TreeSHAP Explainability\n(Global Impact & Driver Waterfall)"]
     end
 ```
 
@@ -35,28 +35,28 @@ flowchart LR
 
 ## Key Features
 
-- **Grand Prix Centric**: Organizes session data by Season and Round across Free Practice, Qualifying, Sprint Shootout, Sprint Race, and Grand Prix.
-- **ML / Monte Carlo Engine**: Trained Random Forest Regressor combined with a 2,000-iteration stochastic simulation incorporating physics-calibrated lap variance ($\mathcal{N}(0, 1.4)$).
+- **Grand Prix Centric**: Organizes session data by Season and Round across Free Practice, Qualifying, Sprint Shootout, Sprint Race, and Grand Prix, plus circuit technical metadata (`length_km`, `corners`, `downforce`, `overtaking_difficulty`, `tire_wear`, `type`).
+- **10-Feature ML & Vectorized Monte Carlo Engine**: Random Forest Regressor trained across 10 pre-race features (`grid_norm`, `quali_gap_norm`, `pace_norm`, `pace_consistency`, lagged pre-race EWMA `driver_form` and `constructor_form`, `overtaking_difficulty`, `is_street_circuit`, `has_practice_data`, `is_sprint`) paired with a seeded, vectorized NumPy simulator calibrating variance by circuit overtaking difficulty and `weather.rainfall`, and DNF rates by constructor reliability.
 - **Non-Finisher Points Withholding**: Simulated DNFs are strictly excluded from top-10 points allocation, advancing classified finishers into vacated championship points positions.
-- **SHAP Explainability**: Global feature importances and per-driver marginal waterfall breakdowns explaining *why* each driver is predicted to finish in a given position.
+- **SHAP Explainability & Backtesting**: Global feature sensitivity charts, per-driver Plotly SHAP waterfall charts (`Base Value` -> feature pushes -> `Predicted Pos`), and an automatic **Predicted vs. Actual** backtest view when official race results exist.
 - **Regulatory Rules Support**: Full support for Sprint Weekends, dynamically handling 2022 sprint rules (Saturday sprint sets Sunday grid) versus 2023+ regulations (qualifying sets Sunday grid; shootout sets sprint grid), and 20 vs. 22 car knockout thresholds.
-- **Decoupled Architecture**: Framework-agnostic domain and modeling logic separated from Streamlit presentation and state caching adapters.
+- **Decoupled Architecture & Live Metadata Sync**: Framework-agnostic domain and modeling logic separated from Streamlit presentation/caching adapters, with `scripts/train_historical_model.py` exporting `data/models/model_metadata.json` so dashboard model specification cards stay synchronized with the latest training run.
 
 ---
 
 ## Model Performance
 
-The core ML engine (`RandomForestRegressor`) is trained on historical telemetry pace and qualifying results from 2022 to the present across temporal out-of-time splits (Train: 2022–2024, Validation: 2025, Test: 2026):
+The core ML engine (`RandomForestRegressor`, `max_depth=6`, `min_samples_leaf=4`, `max_features=0.8`) is trained on historical telemetry, qualifying gaps, rolling form, and circuit metadata from 2022 to the present across temporal out-of-time splits (`Train`: 2022–2024 [1,165 samples], `Validation`: 2025 [419 samples], `Test`: 2026 [348 samples]):
 
-| Benchmark Metric | Out-of-Time Test (2026) | Baseline (Grid Only) | Model Delta |
+| Benchmark Metric | 2025 Validation (419 Samples) | 2026 Out-of-Time Test (348 Samples) | 2026 Baseline Comparison |
 | :--- | :--- | :--- | :--- |
-| **Points Finish Accuracy (Top 10)** | **76.7%** (F1: 0.798) | 68.4% (F1: 0.680) | **+8.3% accuracy** |
-| **Podium Finish Accuracy (Top 3)** | **87.2%** (F1: 0.583) | 82.8% (Dummy Prior) | **+4.4% accuracy** |
-| **Mean Absolute Error (MAE)** | **2.43 positions** | 3.20 positions | **-0.77 pos error** |
-| **Root Mean Squared Error (RMSE)** | **3.05 positions** | 4.12 positions | **-1.07 pos error** |
-| **Explained Variance ($R^2$)** | **0.656** | 0.474 | **+38.4% explained variance** |
+| **Points Finish Accuracy (Top 10)** | **79.7%** (F1: 0.815) | **81.3%** (F1: 0.836) | — |
+| **Podium Finish Accuracy (Top 3)** | **91.4%** (F1: 0.705) | **88.5%** (F1: 0.643) | 82.8% Dummy Prior (**+5.7%**) |
+| **Mean Absolute Error (MAE)** | **2.30 positions** | **2.21 positions** | 2.34 positions Grid-Only (**-0.13 pos**) |
+| **Root Mean Squared Error (RMSE)** | **3.01 positions** | **2.84 positions** | — |
+| **Explained Variance ($R^2$)** | **0.662** | **0.703** | — |
 
-*Target labels during training are strictly restricted to classified race finishers to prevent mechanical retirement label corruption.*
+*Target labels during training are strictly restricted to classified race finishers to prevent mechanical retirement label corruption. Running `scripts/train_historical_model.py` exports these hyperparameters, partition counts, and evaluation metrics to `data/models/model_metadata.json`.*
 
 ---
 
@@ -71,6 +71,8 @@ cd f1-predictor
 ### 2. Install Dependencies
 ```bash
 pip install -r requirements.txt
+# Or editable install with development tools (pytest, ruff, bandit):
+pip install -e ".[dev]"
 ```
 
 ### 3. Run Quality Verification & Tests

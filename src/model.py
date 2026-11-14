@@ -4,6 +4,7 @@ Combines supervised Random Forest regression with calibrated Monte Carlo simulat
 and TreeSHAP interpretability.
 """
 
+import json
 import logging
 from collections.abc import Sequence
 from pathlib import Path
@@ -14,7 +15,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 
-from src.config import MODELS_DIR
+from src.config import MODELS_DIR, OVERTAKING_DIFFICULTY_MAP, get_constructor_dnf_rate
 
 # Optional SHAP explainability
 try:
@@ -40,6 +41,164 @@ POINTS_MAP: dict[int, int] = {
     10: 1,
 }
 
+# Context-dependent calibration multipliers for Monte Carlo simulation
+WET_VARIANCE_MULTIPLIER: float = 1.35
+WET_DNF_MULTIPLIER: float = 1.25
+
+
+def _is_wet_condition(
+    df: pd.DataFrame,
+    weather: dict[str, Any] | None = None,
+    rainfall: bool | None = None,
+) -> bool:
+    """Resolve whether race simulation operates under wet-weather conditions."""
+    if rainfall is not None:
+        return bool(rainfall)
+    if isinstance(weather, dict) and "rainfall" in weather:
+        return bool(weather.get("rainfall"))
+    if "rainfall" in df.columns:
+        return bool(df["rainfall"].fillna(False).astype(bool).any())
+    return False
+
+
+def _resolve_simulation_variance(
+    df: pd.DataFrame,
+    base_std: float,
+    weather: dict[str, Any] | None = None,
+    rainfall: bool | None = None,
+) -> np.ndarray:
+    """Compute context-calibrated positional noise std per driver.
+
+    Scales base variance inversely with circuit overtaking_difficulty and increases
+    variance under wet-weather conditions.
+    """
+    n_drivers = len(df)
+    if "overtaking_difficulty" in df.columns:
+        raw_col = df["overtaking_difficulty"]
+        parsed_vals: list[float] = []
+        for val in raw_col:
+            if pd.isna(val):
+                parsed_vals.append(0.50)
+            elif isinstance(val, str):
+                cleaned = val.strip().lower()
+                if cleaned in OVERTAKING_DIFFICULTY_MAP:
+                    parsed_vals.append(OVERTAKING_DIFFICULTY_MAP[cleaned])
+                else:
+                    try:
+                        parsed_vals.append(float(cleaned))
+                    except ValueError:
+                        parsed_vals.append(0.50)
+            else:
+                try:
+                    parsed_vals.append(float(val))
+                except (TypeError, ValueError):
+                    parsed_vals.append(0.50)
+        overtaking_scores = np.clip(np.array(parsed_vals, dtype=np.float64), 0.0, 1.0)
+    else:
+        overtaking_scores = np.full(n_drivers, 0.50, dtype=np.float64)
+
+    overtaking_factor = 1.20 - 0.40 * overtaking_scores
+    wet_factor = WET_VARIANCE_MULTIPLIER if _is_wet_condition(df, weather=weather, rainfall=rainfall) else 1.0
+    stds = base_std * overtaking_factor * wet_factor
+    return np.clip(stds, 0.05, None)
+
+
+def _resolve_driver_dnf_probs(
+    df: pd.DataFrame,
+    base_dnf_prob: float = 0.05,
+    dnf_prob_override: float | None = None,
+    constructor_dnf_rates: dict[str, float] | None = None,
+    weather: dict[str, Any] | None = None,
+    rainfall: bool | None = None,
+) -> np.ndarray:
+    """Resolve per-driver retirement probabilities with constructor and weather calibration."""
+    is_wet = _is_wet_condition(df, weather=weather, rainfall=rainfall)
+    target_base = dnf_prob_override if dnf_prob_override is not None else base_dnf_prob
+    has_dnf_col = "dnf_prob" in df.columns
+
+    probs: list[float] = []
+    for _, row in df.iterrows():
+        if has_dnf_col and dnf_prob_override is None and pd.notna(row.get("dnf_prob")):
+            try:
+                p = float(row.get("dnf_prob"))
+            except (TypeError, ValueError):
+                p = float(target_base)
+        else:
+            team_val = row.get("team")
+            team_str = str(team_val).strip() if pd.notna(team_val) else None
+            drv_val = row.get("driver")
+            drv_str = str(drv_val).strip() if pd.notna(drv_val) else None
+            matched_rate = get_constructor_dnf_rate(
+                team_name=team_str,
+                driver_code=drv_str,
+                default_rate=-1.0,
+                custom_rates=constructor_dnf_rates,
+            )
+            if matched_rate >= 0.0:
+                if dnf_prob_override is not None:
+                    p = matched_rate * (dnf_prob_override / 0.05)
+                elif base_dnf_prob != 0.05 and constructor_dnf_rates is None:
+                    p = matched_rate * (base_dnf_prob / 0.05)
+                else:
+                    p = matched_rate
+            else:
+                p = float(target_base)
+
+        if is_wet and dnf_prob_override is None:
+            p *= WET_DNF_MULTIPLIER
+
+        probs.append(p)
+
+    return np.clip(np.array(probs, dtype=np.float64), 0.0, 0.99)
+
+
+def _run_vectorized_monte_carlo(
+    base_scores: np.ndarray,
+    noise_stds: np.ndarray,
+    dnf_probs: np.ndarray,
+    n_sims: int,
+    points_map: dict[int, int],
+    rng: np.random.Generator,
+) -> dict[str, np.ndarray]:
+    """Execute vectorized 2D Monte Carlo race simulations across (n_sims, n_drivers)."""
+    n_sims_safe = max(int(n_sims), 1)
+    n_drivers = len(base_scores)
+
+    noise = rng.normal(0.0, noise_stds[np.newaxis, :], size=(n_sims_safe, n_drivers))
+    sim_scores = base_scores[np.newaxis, :] + noise
+    dnf_mask = rng.random((n_sims_safe, n_drivers)) < dnf_probs[np.newaxis, :]
+
+    masked_scores = np.where(dnf_mask, np.inf, sim_scores)
+    order = np.argsort(masked_scores, axis=1)
+    ranks = np.argsort(order, axis=1) + 1
+    sim_positions = np.where(dnf_mask, np.nan, ranks.astype(np.float64))
+
+    points_lookup = np.array([0.0] + [float(points_map.get(r, 0)) for r in range(1, n_drivers + 1)], dtype=np.float64)
+    sim_points = points_lookup[np.where(dnf_mask, 0, ranks)]
+
+    classified_mask = ~dnf_mask
+    win_rate = np.mean((ranks == 1) & classified_mask, axis=0)
+    podium_rate = np.mean((ranks >= 1) & (ranks <= 3) & classified_mask, axis=0)
+    points_rate = np.mean((ranks >= 1) & (ranks <= 10) & classified_mask, axis=0)
+    exp_points = np.mean(sim_points, axis=0)
+    finish_rate = np.mean(classified_mask, axis=0)
+
+    finish_counts = np.sum(classified_mask, axis=0)
+    avg_finish = np.where(
+        finish_counts > 0,
+        np.nansum(sim_positions, axis=0) / np.maximum(finish_counts, 1),
+        float(n_drivers),
+    )
+
+    return {
+        "win_rate": win_rate,
+        "podium_rate": podium_rate,
+        "points_rate": points_rate,
+        "exp_points": exp_points,
+        "finish_rate": finish_rate,
+        "avg_finish": avg_finish,
+    }
+
 
 def load_saved_ml_model(model_path: Path | None = None) -> RandomForestRegressor | None:
     """Load pre-trained Random Forest model binary from disk."""
@@ -54,13 +213,36 @@ def load_saved_ml_model(model_path: Path | None = None) -> RandomForestRegressor
     return None
 
 
+def load_model_metadata(metadata_path: Path | None = None) -> dict[str, Any]:
+    """Load persisted training metadata JSON from disk, returning empty dict if unavailable."""
+    target_path = metadata_path if metadata_path is not None else MODELS_DIR / "model_metadata.json"
+    if target_path.exists():
+        try:
+            with open(target_path, encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return data
+        except Exception as exc:
+            logger.warning("Failed to load model metadata from %s: %s", target_path, exc)
+    return {}
+
+
 class AdvancedRacePredictor:
     """Heuristic Monte Carlo simulator for race outcomes based on grid position and pace."""
 
-    def __init__(self, grid_weight: float = 0.55, pace_weight: float = 0.45, base_dnf_prob: float = 0.05) -> None:
+    def __init__(
+        self,
+        grid_weight: float = 0.55,
+        pace_weight: float = 0.45,
+        base_dnf_prob: float = 0.05,
+        constructor_dnf_rates: dict[str, float] | None = None,
+        random_seed: int | None = 42,
+    ) -> None:
         self.grid_weight = grid_weight
         self.pace_weight = pace_weight
         self.base_dnf_prob = base_dnf_prob
+        self.constructor_dnf_rates = constructor_dnf_rates
+        self.random_seed = random_seed
         self.pace_variability = 0.5
         self.points_map = POINTS_MAP
 
@@ -82,56 +264,61 @@ class AdvancedRacePredictor:
         sim_df["base_score"] = (sim_df["grid"] * self.grid_weight) + (sim_df["pace_rank"] * self.pace_weight)
         return sim_df
 
-    def predict(self, features: pd.DataFrame, n_sims: int = 1000) -> pd.DataFrame:
-        """Run Monte Carlo simulations with proper DNF points withholding."""
+    def predict(
+        self,
+        features: pd.DataFrame,
+        n_sims: int = 1000,
+        dnf_prob: float | None = None,
+        weather: dict[str, Any] | None = None,
+        rainfall: bool | None = None,
+        constructor_dnf_rates: dict[str, float] | None = None,
+        seed: int | None = 42,
+    ) -> pd.DataFrame:
+        """Run vectorized Monte Carlo simulations with context-calibrated variance and DNF rates."""
         if features.empty or "driver" not in features.columns:
             return pd.DataFrame()
 
         sim_df = self.calculate_base_score(features)
         drivers = sim_df["driver"].values
-        base_scores = sim_df["base_score"].values
-        n_drivers = len(drivers)
+        base_scores = sim_df["base_score"].values.astype(np.float64)
 
-        # sim_positions stores finishing rank (1..N_finishers) or np.nan for DNFs
-        sim_positions = np.full((n_sims, n_drivers), np.nan)
-
-        for i in range(n_sims):
-            noise = np.random.normal(0, self.pace_variability, size=n_drivers)
-            iter_scores = base_scores + noise
-            dnf_mask = np.random.random(n_drivers) < self.base_dnf_prob
-
-            finisher_indices = np.where(~dnf_mask)[0]
-            if len(finisher_indices) > 0:
-                finisher_scores = iter_scores[finisher_indices]
-                sorted_finisher_order = np.argsort(finisher_scores)
-                for rank_pos, f_idx in enumerate(sorted_finisher_order):
-                    sim_positions[i, finisher_indices[f_idx]] = rank_pos + 1
+        noise_stds = _resolve_simulation_variance(
+            sim_df,
+            base_std=self.pace_variability,
+            weather=weather,
+            rainfall=rainfall,
+        )
+        effective_rates = constructor_dnf_rates if constructor_dnf_rates is not None else self.constructor_dnf_rates
+        dnf_probs = _resolve_driver_dnf_probs(
+            sim_df,
+            base_dnf_prob=self.base_dnf_prob,
+            dnf_prob_override=dnf_prob,
+            constructor_dnf_rates=effective_rates,
+            weather=weather,
+            rainfall=rainfall,
+        )
+        rng = np.random.default_rng(seed)
+        mc_stats = _run_vectorized_monte_carlo(
+            base_scores=base_scores,
+            noise_stds=noise_stds,
+            dnf_probs=dnf_probs,
+            n_sims=n_sims,
+            points_map=self.points_map,
+            rng=rng,
+        )
 
         stats: list[dict[str, Any]] = []
         for idx, driver in enumerate(drivers):
-            driver_ranks = sim_positions[:, idx]
-            classified_mask = ~np.isnan(driver_ranks)
-            classified_ranks = driver_ranks[classified_mask]
-
-            win_count = np.sum(driver_ranks == 1)
-            podium_count = np.sum((driver_ranks >= 1) & (driver_ranks <= 3))
-            points_count = np.sum((driver_ranks >= 1) & (driver_ranks <= 10))
-
-            total_points = sum(self.points_map.get(int(r), 0) for r in classified_ranks)
-            exp_points = total_points / n_sims
-            finish_rate = float(np.mean(classified_mask))
-            avg_finish = float(np.mean(classified_ranks)) if len(classified_ranks) > 0 else float(n_drivers)
-
             stats.append(
                 {
                     "Driver": driver,
                     "Grid": int(sim_df.iloc[idx]["grid"]),
-                    "Win %": round(win_count / n_sims, 4),
-                    "Podium %": round(podium_count / n_sims, 4),
-                    "Points %": round(points_count / n_sims, 4),
-                    "Exp. Points": round(exp_points, 2),
-                    "Finish Rate %": round(finish_rate * 100, 1),
-                    "Avg Finish": round(avg_finish, 1),
+                    "Win %": round(float(mc_stats["win_rate"][idx]), 4),
+                    "Podium %": round(float(mc_stats["podium_rate"][idx]), 4),
+                    "Points %": round(float(mc_stats["points_rate"][idx]), 4),
+                    "Exp. Points": round(float(mc_stats["exp_points"][idx]), 2),
+                    "Finish Rate %": round(float(mc_stats["finish_rate"][idx]) * 100, 1),
+                    "Avg Finish": round(float(mc_stats["avg_finish"][idx]), 1),
                 }
             )
 
@@ -142,20 +329,39 @@ class AdvancedRacePredictor:
 class F1MLPredictor:
     """Production ML-based F1 Race Predictor using Random Forest and SHAP explainability."""
 
-    def __init__(self, model: RandomForestRegressor | None = None) -> None:
+    def __init__(
+        self,
+        model: RandomForestRegressor | None = None,
+        *,
+        load_historical: bool = True,
+        constructor_dnf_rates: dict[str, float] | None = None,
+        random_seed: int | None = 42,
+    ) -> None:
         self.model = model
         self.is_historical = False
+        self.constructor_dnf_rates = constructor_dnf_rates
+        self.random_seed = random_seed
         self.feature_names: list[str] = [
             "grid_norm",
+            "quali_gap_norm",
             "pace_norm",
             "pace_consistency",
+            "driver_form",
+            "constructor_form",
+            "overtaking_difficulty",
+            "is_street_circuit",
             "has_practice_data",
             "is_sprint",
         ]
         self.feature_descriptions: dict[str, str] = {
             "grid_norm": "Qualifying starting position (0=Pole, 1=Back of grid)",
+            "quali_gap_norm": "Qualifying best lap gap to pole normalized to qualifying spread",
             "pace_norm": "Practice pace gap normalized to session benchmark",
             "pace_consistency": "Practice stint lap consistency (lower std = more consistent)",
+            "driver_form": "Pre-race EWMA of driver's recent classified finishes (0=P1, 1=Back)",
+            "constructor_form": "Pre-race EWMA of constructor's recent classified finishes (0=P1, 1=Back)",
+            "overtaking_difficulty": "Circuit overtaking difficulty score (0.25=Low to 1.00=Very High)",
+            "is_street_circuit": "Street circuit indicator (1=Street, 0=Permanent)",
             "has_practice_data": "Indicator for recorded practice telemetry",
             "is_sprint": "Sprint weekend indicator",
         }
@@ -165,7 +371,7 @@ class F1MLPredictor:
         self.shap_values: np.ndarray | None = None
         self.shap_explainer: Any = None
 
-        if self.model is None:
+        if self.model is None and load_historical:
             self._load_historical_model()
 
     def _load_historical_model(self) -> None:
@@ -186,7 +392,17 @@ class F1MLPredictor:
         features_df["grid"] = pd.to_numeric(features_df["grid"], errors="coerce").fillna(n_drivers)
         features_df["grid_norm"] = (features_df["grid"] - 1.0) / max(n_drivers - 1, 1)
 
-        # 2. Normalized practice pace [0.0, 1.0] relative to observed session spread
+        # 2. Normalized qualifying gap to pole
+        if "quali_gap_norm" in features_df.columns:
+            features_df["quali_gap_norm"] = (
+                pd.to_numeric(features_df["quali_gap_norm"], errors="coerce")
+                .fillna(features_df["grid_norm"])
+                .clip(0.0, 1.5)
+            )
+        else:
+            features_df["quali_gap_norm"] = features_df["grid_norm"]
+
+        # 3. Normalized practice pace [0.0, 1.5] relative to observed session spread
         if "best" in features_df.columns and features_df["best"].notna().any():
             features_df["best"] = pd.to_numeric(features_df["best"], errors="coerce")
             pace_min = float(features_df["best"].dropna().min())
@@ -198,7 +414,7 @@ class F1MLPredictor:
         else:
             features_df["pace_norm"] = features_df["grid_norm"]
 
-        # 3. Practice stint consistency
+        # 4. Practice stint consistency
         if "consistency" in features_df.columns and features_df["consistency"].notna().any():
             features_df["consistency"] = pd.to_numeric(features_df["consistency"], errors="coerce")
             med_consistency = float(features_df["consistency"].dropna().median())
@@ -206,7 +422,41 @@ class F1MLPredictor:
         else:
             features_df["pace_consistency"] = 0.35
 
-        # 4. Binary indicator for presence of practice pace telemetry
+        # 5. Pre-race driver and constructor rolling form
+        if "driver_form" in features_df.columns:
+            features_df["driver_form"] = (
+                pd.to_numeric(features_df["driver_form"], errors="coerce")
+                .fillna(features_df["grid_norm"])
+                .clip(0.0, 1.0)
+            )
+        else:
+            features_df["driver_form"] = features_df["grid_norm"]
+
+        if "constructor_form" in features_df.columns:
+            features_df["constructor_form"] = (
+                pd.to_numeric(features_df["constructor_form"], errors="coerce")
+                .fillna(features_df["grid_norm"])
+                .clip(0.0, 1.0)
+            )
+        else:
+            features_df["constructor_form"] = features_df["grid_norm"]
+
+        # 6. Circuit overtaking difficulty and street circuit indicator
+        if "overtaking_difficulty" in features_df.columns:
+            features_df["overtaking_difficulty"] = (
+                pd.to_numeric(features_df["overtaking_difficulty"], errors="coerce").fillna(0.50).clip(0.0, 1.0)
+            )
+        else:
+            features_df["overtaking_difficulty"] = 0.50
+
+        if "is_street_circuit" in features_df.columns:
+            features_df["is_street_circuit"] = (
+                pd.to_numeric(features_df["is_street_circuit"], errors="coerce").fillna(0.0).clip(0.0, 1.0)
+            )
+        else:
+            features_df["is_street_circuit"] = 0.0
+
+        # 7. Binary indicator for presence of practice pace telemetry
         if "has_practice_data" not in features_df.columns:
             features_df["has_practice_data"] = 1.0
         else:
@@ -214,7 +464,7 @@ class F1MLPredictor:
                 1.0
             )
 
-        # 5. Sprint weekend indicator
+        # 8. Sprint weekend indicator
         if "is_sprint" not in features_df.columns:
             features_df["is_sprint"] = 0.0
         else:
@@ -225,24 +475,41 @@ class F1MLPredictor:
 
     def train_synthetic_fallback(self, n_samples: int = 1500) -> None:
         """Fit a lightweight fallback Random Forest if no historical binary is available."""
-        np.random.seed(42)
+        rng = np.random.default_rng(42)
         X_synth: list[list[float]] = []
         y_synth: list[float] = []
 
         for _ in range(n_samples):
-            grid_norm = float(np.random.uniform(0.0, 1.0))
-            pace_noise = float(np.random.normal(0.0, 0.2))
-            pace_norm = float(np.clip(grid_norm + pace_noise, 0.0, 1.0))
-            consistency = float(np.random.uniform(0.1, 0.6))
-            has_practice = 1.0 if np.random.random() > 0.05 else 0.0
-            is_sprint = 1.0 if np.random.random() > 0.75 else 0.0
+            grid_norm = float(rng.uniform(0.0, 1.0))
+            quali_gap_norm = float(np.clip(grid_norm + rng.normal(0.0, 0.1), 0.0, 1.5))
+            pace_norm = float(np.clip(grid_norm + rng.normal(0.0, 0.2), 0.0, 1.0))
+            consistency = float(rng.uniform(0.1, 0.6))
+            driver_form = float(np.clip(grid_norm + rng.normal(0.0, 0.15), 0.0, 1.0))
+            constructor_form = float(np.clip(grid_norm + rng.normal(0.0, 0.15), 0.0, 1.0))
+            overtaking_difficulty = float(rng.choice([0.25, 0.50, 0.75, 1.00]))
+            is_street_circuit = 1.0 if rng.random() > 0.65 else 0.0
+            has_practice = 1.0 if rng.random() > 0.05 else 0.0
+            is_sprint = 1.0 if rng.random() > 0.75 else 0.0
 
             # Finishing position among classified finishers (supporting grids up to 22 drivers)
-            target_finish = 1.0 + (grid_norm * 0.75 + pace_norm * 0.25) * 21.0 + np.random.normal(0.0, 1.2)
+            composite = grid_norm * 0.55 + pace_norm * 0.15 + driver_form * 0.20 + constructor_form * 0.10
+            target_finish = 1.0 + composite * 21.0 + float(rng.normal(0.0, 1.2))
             target_finish = float(np.clip(target_finish, 1.0, 22.0))
 
-
-            X_synth.append([grid_norm, pace_norm, consistency, has_practice, is_sprint])
+            X_synth.append(
+                [
+                    grid_norm,
+                    quali_gap_norm,
+                    pace_norm,
+                    consistency,
+                    driver_form,
+                    constructor_form,
+                    overtaking_difficulty,
+                    is_street_circuit,
+                    has_practice,
+                    is_sprint,
+                ]
+            )
             y_synth.append(target_finish)
 
         self.model = RandomForestRegressor(
@@ -254,8 +521,17 @@ class F1MLPredictor:
         self.model.fit(np.array(X_synth), np.array(y_synth))
         self.is_historical = False
 
-    def predict(self, features: pd.DataFrame, n_sims: int = 2000, dnf_prob: float | None = None) -> dict[str, Any]:
-        """Predict race finishing distribution with Monte Carlo simulations and SHAP values."""
+    def predict(
+        self,
+        features: pd.DataFrame,
+        n_sims: int = 2000,
+        dnf_prob: float | None = None,
+        weather: dict[str, Any] | None = None,
+        rainfall: bool | None = None,
+        constructor_dnf_rates: dict[str, float] | None = None,
+        seed: int | None = 42,
+    ) -> dict[str, Any]:
+        """Predict race finishing distribution with vectorized Monte Carlo simulations and SHAP values."""
         if features.empty or "driver" not in features.columns:
             return {
                 "predictions": pd.DataFrame(),
@@ -319,51 +595,47 @@ class F1MLPredictor:
         elif not HAS_SHAP:
             shap_error = "SHAP package is not installed."
 
-        # Monte Carlo Simulation with proper non-finisher exclusion
-        effective_dnf_prob = dnf_prob if dnf_prob is not None else self.base_dnf_prob
-        sim_positions = np.full((n_sims, n_drivers), np.nan)
-
-        for i in range(n_sims):
-            # Performance disturbance per race simulation
-            noise = np.random.normal(0, 1.4, size=n_drivers)
-            sim_scores = predicted_ranks + noise
-            dnf_mask = np.random.random(n_drivers) < effective_dnf_prob
-
-            finisher_indices = np.where(~dnf_mask)[0]
-            if len(finisher_indices) > 0:
-                finisher_scores = sim_scores[finisher_indices]
-                sorted_order = np.argsort(finisher_scores)
-                for rank_pos, f_idx in enumerate(sorted_order):
-                    sim_positions[i, finisher_indices[f_idx]] = rank_pos + 1
+        # Context-calibrated vectorized Monte Carlo Simulation with non-finisher exclusion
+        noise_stds = _resolve_simulation_variance(
+            features_df,
+            base_std=1.4,
+            weather=weather,
+            rainfall=rainfall,
+        )
+        effective_rates = constructor_dnf_rates if constructor_dnf_rates is not None else self.constructor_dnf_rates
+        dnf_probs = _resolve_driver_dnf_probs(
+            features_df,
+            base_dnf_prob=self.base_dnf_prob,
+            dnf_prob_override=dnf_prob,
+            constructor_dnf_rates=effective_rates,
+            weather=weather,
+            rainfall=rainfall,
+        )
+        rng = np.random.default_rng(seed)
+        mc_stats = _run_vectorized_monte_carlo(
+            base_scores=predicted_ranks.astype(np.float64),
+            noise_stds=noise_stds,
+            dnf_probs=dnf_probs,
+            n_sims=n_sims,
+            points_map=self.points_map,
+            rng=rng,
+        )
 
         stats: list[dict[str, Any]] = []
         drivers = features_df["driver"].values
 
         for idx, driver in enumerate(drivers):
-            driver_ranks = sim_positions[:, idx]
-            classified_mask = ~np.isnan(driver_ranks)
-            classified_ranks = driver_ranks[classified_mask]
-
-            win_count = np.sum(driver_ranks == 1)
-            podium_count = np.sum((driver_ranks >= 1) & (driver_ranks <= 3))
-            points_count = np.sum((driver_ranks >= 1) & (driver_ranks <= 10))
-
-            total_points = sum(self.points_map.get(int(r), 0) for r in classified_ranks)
-            exp_points = total_points / n_sims
-            finish_rate = float(np.mean(classified_mask))
-            avg_finish = float(np.mean(classified_ranks)) if len(classified_ranks) > 0 else float(n_drivers)
-
             stats.append(
                 {
                     "Driver": driver,
                     "Grid": int(features_df.iloc[idx]["grid"]),
                     "Predicted Pos": round(float(predicted_ranks[idx]), 1),
-                    "Win %": round(win_count / n_sims, 4),
-                    "Podium %": round(podium_count / n_sims, 4),
-                    "Points %": round(points_count / n_sims, 4),
-                    "Exp. Points": round(exp_points, 2),
-                    "Finish Rate %": round(finish_rate * 100, 1),
-                    "Avg Finish": round(avg_finish, 1),
+                    "Win %": round(float(mc_stats["win_rate"][idx]), 4),
+                    "Podium %": round(float(mc_stats["podium_rate"][idx]), 4),
+                    "Points %": round(float(mc_stats["points_rate"][idx]), 4),
+                    "Exp. Points": round(float(mc_stats["exp_points"][idx]), 2),
+                    "Finish Rate %": round(float(mc_stats["finish_rate"][idx]) * 100, 1),
+                    "Avg Finish": round(float(mc_stats["avg_finish"][idx]), 1),
                 }
             )
 

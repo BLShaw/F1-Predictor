@@ -4,6 +4,8 @@ Enforces a unified telemetry theme, consistent typography, standard margins,
 and accessible hover formatting across all analytical figures.
 """
 
+from typing import Any
+
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -233,3 +235,65 @@ def create_win_probability_chart(
     fig.update_xaxes(title="Win Probability (%)")
     fig.update_yaxes(autorange="reversed")
     return _apply_chart_theme(fig, "PREDICTED WIN PROBABILITY DISTRIBUTION", height=420)
+
+
+def create_shap_waterfall_chart(driver_explanation: dict[str, Any] | None) -> go.Figure | None:
+    """Create horizontal Plotly waterfall chart showing Base Value -> SHAP pushes -> Predicted Pos."""
+    if not driver_explanation or not isinstance(driver_explanation, dict):
+        return None
+
+    base_val = driver_explanation.get("base_prediction")
+    contributions = driver_explanation.get("feature_contributions")
+    if base_val is None or not contributions:
+        return None
+
+    base_float = float(base_val)
+    total_push = sum(float(item.get("shap_contribution", 0.0)) for item in contributions)
+    final_pos = base_float + total_push
+    driver_code = str(driver_explanation.get("driver", "DRIVER"))
+
+    labels: list[str] = ["Base Value"]
+    measures: list[str] = ["absolute"]
+    values: list[float] = [base_float]
+    text_labels: list[str] = [f"P{base_float:.2f}"]
+
+    for item in contributions:
+        contrib = float(item.get("shap_contribution", 0.0))
+        feat_name = str(item.get("feature", ""))
+        feat_val = item.get("value")
+        label = f"{feat_name} ({float(feat_val):.2f})" if feat_val is not None else feat_name
+        labels.append(label)
+        measures.append("relative")
+        values.append(contrib)
+        text_labels.append(f"{contrib:+.3f}")
+
+    labels.append("Predicted Pos")
+    measures.append("total")
+    values.append(final_pos)
+    text_labels.append(f"P{final_pos:.2f}")
+
+    fig = go.Figure(
+        go.Waterfall(
+            orientation="h",
+            measure=measures,
+            y=labels,
+            x=values,
+            text=text_labels,
+            textposition="outside",
+            textfont={"family": CHART_FONT_FAMILY, "size": 10, "color": "#F8FAFC"},
+            decreasing={"marker": {"color": "#10B981", "line": {"color": "rgba(255,255,255,0.25)", "width": 1}}},
+            increasing={"marker": {"color": "#EF4444", "line": {"color": "rgba(255,255,255,0.25)", "width": 1}}},
+            totals={"marker": {"color": "#38BDF8", "line": {"color": "rgba(255,255,255,0.3)", "width": 1}}},
+            connector={"line": {"color": "rgba(148, 163, 184, 0.35)", "width": 1, "dash": "dot"}},
+            hovertemplate="<b>%{y}</b><br>Step Value: %{x:+.3f}<br>Display: %{text}<extra></extra>",
+        )
+    )
+
+    fig.update_xaxes(title="Predicted Finishing Position")
+    fig.update_yaxes(autorange="reversed")
+    return _apply_chart_theme(
+        fig,
+        f"SHAP POSITION WATERFALL — {driver_code}",
+        height=380,
+        margin={"l": 180, "r": 65, "t": 48, "b": 40},
+    )

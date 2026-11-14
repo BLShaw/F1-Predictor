@@ -22,6 +22,7 @@ from src.data_loader import (
     load_gp_data as _load_gp_data,
 )
 from src.model import F1MLPredictor
+from src.model import load_model_metadata as _load_model_metadata
 from src.model import load_saved_ml_model as _load_saved_ml_model
 
 
@@ -53,6 +54,12 @@ def get_cached_gp_data(year: int, gp_folder: str) -> dict[str, Any]:
 def get_cached_model() -> RandomForestRegressor | None:
     """Return cached Random Forest model artifact from memory."""
     return _load_saved_ml_model()
+
+
+@st.cache_data
+def get_cached_model_metadata() -> dict[str, Any]:
+    """Return cached training metadata JSON for UI technical specification."""
+    return _load_model_metadata()
 
 
 @st.cache_data

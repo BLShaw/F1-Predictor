@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from src.ui.charts import (
     create_pace_chart,
     create_qualifying_chart,
+    create_shap_waterfall_chart,
     create_win_probability_chart,
 )
 
@@ -125,3 +126,28 @@ def test_create_win_probability_chart_valid() -> None:
 def test_create_win_probability_chart_empty() -> None:
     """Verify win probability chart returns None on empty input."""
     assert create_win_probability_chart(pd.DataFrame()) is None
+
+
+def test_create_shap_waterfall_chart_valid_and_empty() -> None:
+    """Verify SHAP waterfall chart builds Plotly Waterfall figure and guards empty inputs."""
+    assert create_shap_waterfall_chart(None) is None
+    assert create_shap_waterfall_chart({}) is None
+    assert create_shap_waterfall_chart({"driver": "VER", "base_prediction": 5.0, "feature_contributions": []}) is None
+
+    explanation = {
+        "driver": "VER",
+        "base_prediction": 8.5,
+        "feature_contributions": [
+            {"feature": "grid_norm", "value": 0.05, "shap_contribution": -5.2},
+            {"feature": "driver_form", "value": 0.12, "shap_contribution": -1.5},
+            {"feature": "pace_norm", "value": 0.25, "shap_contribution": 0.4},
+        ],
+    }
+    fig = create_shap_waterfall_chart(explanation)
+    assert isinstance(fig, go.Figure)
+    assert isinstance(fig.data[0], go.Waterfall)
+    assert fig.data[0].orientation == "h"
+    assert list(fig.data[0].y)[0] == "Base Value"
+    assert list(fig.data[0].y)[-1] == "Predicted Pos"
+    assert list(fig.data[0].measure) == ["absolute", "relative", "relative", "relative", "total"]
+    assert fig.data[0].text[-1] == "P2.20"

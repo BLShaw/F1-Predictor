@@ -8,9 +8,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from src.data_loader import build_weekend_features, resolve_starting_grid
+from src.data_loader import build_weekend_features, get_race_results, resolve_starting_grid
 from src.model import AdvancedRacePredictor, F1MLPredictor
-from src.ui.charts import _apply_chart_theme, create_win_probability_chart
+from src.ui.charts import _apply_chart_theme, create_shap_waterfall_chart, create_win_probability_chart
 from src.ui.components import (
     render_empty_state,
     render_metric_grid,
@@ -18,9 +18,110 @@ from src.ui.components import (
     render_notice,
     render_section_header,
 )
-from src.ui.state import get_cached_model
+from src.ui.state import get_cached_model, get_cached_model_metadata
 
 logger = logging.getLogger(__name__)
+
+
+def evaluate_race_backtest(
+    predictions: pd.DataFrame,
+    race_session: dict[str, Any] | None,
+) -> tuple[pd.DataFrame, dict[str, Any] | None]:
+    """Compare race predictions against official classified race results when available."""
+    if predictions.empty or "Driver" not in predictions.columns:
+        return predictions.copy(), None
+
+    race_df = get_race_results(race_session)
+    if race_df.empty or "driver" not in race_df.columns:
+        return predictions.copy(), None
+
+    actual_map: dict[str, int | None] = {}
+    for _, row in race_df.iterrows():
+        drv = str(row["driver"]).strip()
+        if not drv:
+            continue
+        status = str(row.get("status", "")).strip()
+        is_classified_status = status == "Finished" or status.startswith("+") or "Lap" in status
+        pos_val = pd.to_numeric(row.get("position"), errors="coerce")
+        if is_classified_status and pd.notna(pos_val) and int(pos_val) > 0:
+            actual_map[drv] = int(pos_val)
+        else:
+            actual_map[drv] = None
+
+    if not actual_map:
+        return predictions.copy(), None
+
+    enriched = predictions.copy().reset_index(drop=True)
+    has_pred_pos = "Predicted Pos" in enriched.columns
+    has_avg_finish = "Avg Finish" in enriched.columns
+    has_grid = "Grid" in enriched.columns
+
+    actual_pos_labels: list[str] = []
+    pos_deltas: list[str] = []
+    abs_errors: list[float] = []
+    grid_abs_errors: list[float] = []
+
+    for idx, row in enriched.iterrows():
+        drv = str(row["Driver"]).strip()
+        if drv not in actual_map:
+            actual_pos_labels.append("—")
+            pos_deltas.append("—")
+            continue
+
+        actual_pos = actual_map[drv]
+        if actual_pos is None:
+            actual_pos_labels.append("DNF")
+            pos_deltas.append("—")
+            continue
+
+        actual_pos_labels.append(f"P{actual_pos}")
+        if has_pred_pos and pd.notna(row.get("Predicted Pos")):
+            pred_pos_val = float(row["Predicted Pos"])
+        elif has_avg_finish and pd.notna(row.get("Avg Finish")):
+            pred_pos_val = float(row["Avg Finish"])
+        else:
+            pred_pos_val = float(idx + 1)
+
+        delta = int(round(pred_pos_val)) - actual_pos
+        pos_deltas.append(f"{delta:+d}" if delta != 0 else "0")
+        abs_errors.append(abs(pred_pos_val - actual_pos))
+
+        if has_grid and pd.notna(row.get("Grid")):
+            grid_abs_errors.append(abs(float(row["Grid"]) - actual_pos))
+
+    if not abs_errors:
+        return predictions.copy(), None
+
+    enriched["Actual Pos"] = actual_pos_labels
+    enriched["Position Delta"] = pos_deltas
+
+    classified_sorted = [
+        drv for drv, pos in sorted(((d, p) for d, p in actual_map.items() if p is not None), key=lambda item: item[1])
+    ]
+    actual_top10 = set(classified_sorted[:10])
+    actual_top3 = set(classified_sorted[:3])
+
+    predicted_drivers = [str(d).strip() for d in enriched["Driver"]]
+    top10_hits = len(actual_top10 & set(predicted_drivers[:10]))
+    podium_hits = len(actual_top3 & set(predicted_drivers[:3]))
+
+    actual_winner = classified_sorted[0]
+    predicted_winner = predicted_drivers[0] if predicted_drivers else ""
+
+    metrics: dict[str, Any] = {
+        "weekend_mae": float(sum(abs_errors) / len(abs_errors)),
+        "grid_baseline_mae": float(sum(grid_abs_errors) / len(grid_abs_errors)) if grid_abs_errors else None,
+        "top10_accuracy": float(top10_hits / max(len(actual_top10), 1)),
+        "top10_hits": top10_hits,
+        "top10_total": len(actual_top10),
+        "podium_hits": podium_hits,
+        "podium_total": len(actual_top3),
+        "winner_correct": bool(predicted_winner == actual_winner),
+        "predicted_winner": predicted_winner,
+        "actual_winner": actual_winner,
+        "classified_count": len(abs_errors),
+    }
+    return enriched, metrics
 
 
 def render_predictions_tab(gp_data: dict[str, Any], selected_gp: dict[str, Any]) -> None:
@@ -133,11 +234,42 @@ def render_predictions_tab(gp_data: dict[str, Any], selected_gp: dict[str, Any])
         if fig:
             st.plotly_chart(fig, width="stretch")
 
+        enriched_preds, backtest_metrics = evaluate_race_backtest(predictions, sessions.get("race"))
+
+        if backtest_metrics is not None:
+            render_section_header(
+                "PREDICTED VS. ACTUAL BACKTEST",
+                "Model accuracy evaluation against official classified Grand Prix results",
+            )
+            grid_mae = backtest_metrics.get("grid_baseline_mae")
+            backtest_cards = [
+                {
+                    "label": "Weekend MAE",
+                    "value": f"{backtest_metrics['weekend_mae']:.2f} Pos",
+                    "delta": f"Grid MAE: {grid_mae:.2f}" if grid_mae is not None else None,
+                },
+                {
+                    "label": "Top-10 Hit Accuracy",
+                    "value": f"{backtest_metrics['top10_accuracy'] * 100:.1f}%",
+                    "delta": f"{backtest_metrics['top10_hits']}/{backtest_metrics['top10_total']} Finishers",
+                },
+                {
+                    "label": "Podium Hits",
+                    "value": f"{backtest_metrics['podium_hits']}/{backtest_metrics['podium_total']}",
+                },
+                {
+                    "label": "Winner Prediction",
+                    "value": "CORRECT" if backtest_metrics["winner_correct"] else "MISSED",
+                    "delta": f"Actual P1: {backtest_metrics['actual_winner']} (Pred: {backtest_metrics['predicted_winner']})",
+                },
+            ]
+            render_metric_grid(backtest_cards)
+
         render_section_header(
             "PROJECTED CLASSIFICATION MATRIX",
             "Ranked expected points, podium likelihood, and average finishing positions",
         )
-        display_df = predictions.copy()
+        display_df = enriched_preds.copy()
         display_df["Win %"] = (display_df["Win %"] * 100).round(1).astype(str) + "%"
         display_df["Podium %"] = (display_df["Podium %"] * 100).round(1).astype(str) + "%"
         display_df["Points %"] = (display_df["Points %"] * 100).round(1).astype(str) + "%"
@@ -146,7 +278,7 @@ def render_predictions_tab(gp_data: dict[str, Any], selected_gp: dict[str, Any])
 
         st.dataframe(display_df, width="stretch", hide_index=True)
 
-        csv = predictions.to_csv(index=False)
+        csv = enriched_preds.to_csv(index=False)
         folder = selected_gp.get("folder", "grand_prix")
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M")
         st.download_button(
@@ -197,6 +329,11 @@ def render_predictions_tab(gp_data: dict[str, Any], selected_gp: dict[str, Any])
                         "Performance Interpretation": "Lower is better (0.0 = Pole Position)",
                     },
                     {
+                        "Feature Identifier": "quali_gap_norm",
+                        "Input Description": "Best qualifying lap delta to pole normalized to qualifying spread",
+                        "Performance Interpretation": "Lower is better (0.0 = Pole Qualifying Lap)",
+                    },
+                    {
                         "Feature Identifier": "pace_norm",
                         "Input Description": "Practice flying lap pace delta relative to session fastest lap",
                         "Performance Interpretation": "Lower is better (0.0 = Fastest Practice Lap)",
@@ -205,6 +342,36 @@ def render_predictions_tab(gp_data: dict[str, Any], selected_gp: dict[str, Any])
                         "Feature Identifier": "pace_consistency",
                         "Input Description": "Standard deviation of representative clean flying laps",
                         "Performance Interpretation": "Lower is better (tighter stint variance)",
+                    },
+                    {
+                        "Feature Identifier": "driver_form",
+                        "Input Description": "Pre-race EWMA of driver's recent classified finishes (last 5 races)",
+                        "Performance Interpretation": "Lower is better (0.0 = P1 form)",
+                    },
+                    {
+                        "Feature Identifier": "constructor_form",
+                        "Input Description": "Pre-race EWMA of constructor's recent classified finishes",
+                        "Performance Interpretation": "Lower is better (0.0 = Top team form)",
+                    },
+                    {
+                        "Feature Identifier": "overtaking_difficulty",
+                        "Input Description": "Circuit overtaking difficulty score from tracks.json (0.25–1.00)",
+                        "Performance Interpretation": "Higher increases starting grid importance",
+                    },
+                    {
+                        "Feature Identifier": "is_street_circuit",
+                        "Input Description": "Binary indicator for street circuits (1=Street, 0=Permanent)",
+                        "Performance Interpretation": "Captures street-track attrition and passing constraints",
+                    },
+                    {
+                        "Feature Identifier": "has_practice_data",
+                        "Input Description": "Indicator for recorded practice telemetry (1=Available, 0=Imputed)",
+                        "Performance Interpretation": "Flags fallback imputation on missed practice",
+                    },
+                    {
+                        "Feature Identifier": "is_sprint",
+                        "Input Description": "Binary indicator for Sprint weekend format",
+                        "Performance Interpretation": "Adjusts for reduced practice / parc ferme setup constraints",
                     },
                 ]
             )
@@ -228,6 +395,10 @@ def render_predictions_tab(gp_data: dict[str, Any], selected_gp: dict[str, Any])
                     drv_idx = driver_list.index(selected_driver)
                     drv_expl = predictor_inst.get_driver_explanation(drv_idx, features_used)
                     if drv_expl and drv_expl.get("feature_contributions"):
+                        fig_waterfall = create_shap_waterfall_chart(drv_expl)
+                        if fig_waterfall is not None:
+                            st.plotly_chart(fig_waterfall, width="stretch")
+
                         expl_rows = [
                             {
                                 "Feature": item["feature"],
@@ -257,6 +428,7 @@ def render_predictions_tab(gp_data: dict[str, Any], selected_gp: dict[str, Any])
             dnf_rate=params.get("dnf_prob", 0.05),
             train_seasons="2022-2024",
             test_season="2026",
+            metadata=get_cached_model_metadata(),
         )
 
         if ml_results and ml_results.get("features_used") is not None:
