@@ -1,7 +1,7 @@
 """Predictions tab module providing ML predictions, Monte Carlo simulation, and SHAP explainability."""
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import pandas as pd
@@ -280,7 +280,7 @@ def render_predictions_tab(gp_data: dict[str, Any], selected_gp: dict[str, Any])
 
         csv = enriched_preds.to_csv(index=False)
         folder = selected_gp.get("folder", "grand_prix")
-        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
         st.download_button(
             "Download Prediction Matrix (CSV)",
             data=csv,

@@ -8,7 +8,7 @@ import json
 import logging
 import os
 import sys
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -382,7 +382,7 @@ def main() -> bool:
         },
     }
 
-    trained_at = datetime.now(UTC).isoformat()
+    trained_at = datetime.now(timezone.utc).isoformat()
     if final_meta_path.exists():
         try:
             existing_meta = json.loads(final_meta_path.read_text(encoding="utf-8"))

@@ -5,7 +5,7 @@ import json
 import logging
 import sys
 import time
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -110,8 +110,8 @@ def _to_utc_datetime(raw_ts: Any) -> datetime | None:
         return None
     dt = ts.to_pydatetime()
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=UTC)
-    return dt.astimezone(UTC)
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def save_season_schedule(year: int, schedule: pd.DataFrame) -> None:
@@ -144,7 +144,7 @@ def get_scheduled_sessions(event: Any, now_utc: datetime | None = None) -> list[
     """Determine which scheduled sessions are eligible for ingestion up to now_utc."""
     now_utc_aware: datetime | None = None
     if now_utc is not None:
-        now_utc_aware = now_utc.replace(tzinfo=UTC) if now_utc.tzinfo is None else now_utc.astimezone(UTC)
+        now_utc_aware = now_utc.replace(tzinfo=timezone.utc) if now_utc.tzinfo is None else now_utc.astimezone(timezone.utc)
 
     scheduled: list[str] = []
     has_session_metadata = False
@@ -308,7 +308,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.years is None:
             return updated
 
-    now_utc = datetime.now(UTC)
+    now_utc = datetime.now(timezone.utc)
     current_year = now_utc.year
     target_years = sorted(args.years) if args.years else list(range(2022, current_year + 1))
 
